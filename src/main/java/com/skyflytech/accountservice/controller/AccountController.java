@@ -3,6 +3,7 @@ package com.skyflytech.accountservice.controller;
 import com.mongodb.client.result.DeleteResult;
 import com.skyflytech.accountservice.domain.APIResponse;
 import com.skyflytech.accountservice.domain.account.Account;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.service.AccountService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,13 +27,14 @@ public class AccountController {
 
     private final  AccountService accountService;
     private final MongoOperations mongoOperations;
-
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     @Value("${spring.profiles.active}")
     private String activeProfile;
 
-    public AccountController(MongoOperations mongoOperations, AccountService accountService, AccountService accountService1) {
+    public AccountController(MongoOperations mongoOperations, AccountService accountService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.mongoOperations = mongoOperations;
-        this.accountService = accountService1;
+        this.accountService = accountService;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
     @ApiResponse(description = "upload a excel file")
@@ -60,7 +62,7 @@ public class AccountController {
     @GetMapping("/all")
     public ResponseEntity<List<Account>> getAllAccounts() {
 
-        List<Account> accounts = accountService.getAllAccounts();
+        List<Account> accounts = accountService.getAllAccounts(getAccountSetId());
        // int slice= Math.min(accounts.size(), 5);
         return ResponseEntity.ok(accounts);
     }
@@ -105,7 +107,7 @@ public class AccountController {
 
     @GetMapping("/search")
     public ResponseEntity<List<Account>> searchAccounts(@RequestParam("query") String query) {
-        List<Account> accounts = accountService.searchAccounts(query);
+        List<Account> accounts = accountService.searchAccounts(query,getAccountSetId());
         return ResponseEntity.ok(accounts);
     }
 
@@ -133,5 +135,9 @@ public class AccountController {
         DeleteResult result = mongoOperations.remove(new Query(), Account.class);
         long deletedCount = result.getDeletedCount();
         return ResponseEntity.ok(String.format("deleted %d records successfully!",deletedCount));
+    }
+    //get accountSetId
+    private String getAccountSetId(){
+        return currentAccountSetIdHolder.getCurrentAccountSetId();
     }
 }

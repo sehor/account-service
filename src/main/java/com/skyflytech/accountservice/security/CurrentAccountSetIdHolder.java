@@ -8,4 +8,7 @@ public class CurrentAccountSetIdHolder {
     public String getCurrentAccountSetId() {
         return GlobalConst.Current_AccountSet_Id_Test;
     }
+    public void setCurrentAccountSetId(String accountSetId) {
+        //todo
+    }
 }

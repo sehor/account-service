@@ -12,7 +12,6 @@ import com.skyflytech.accountservice.security.AccountSetIdAware;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.List;
 import java.util.Objects;
 
 @Data
@@ -40,7 +39,7 @@ public class Account implements AccountSetIdAware{
 
     private BigDecimal initialBalance=BigDecimal.ZERO;
 
-    public Account(String code, String name,String accountSetId, AccountType type, String parentId, List<String> subAccountIds, AccountingDirection balanceDirection, AccountState state) {
+    public Account(String code, String name, String accountSetId, AccountType type, String parentId, AccountingDirection balanceDirection, AccountState state) {
         this.code = code;
         this.name = name;
         this.type = type;
@@ -50,7 +49,7 @@ public class Account implements AccountSetIdAware{
     }
 
     public Account(String accountId, String name,String accountSetId, AccountType type, AccountingDirection balanceDirection, AccountState state) {
-        this(accountId, name, accountSetId,type, null, null, balanceDirection, state);
+        this(accountId, name, accountSetId,type, null, balanceDirection, state);
     }
 
     public void setInitialBalance(BigDecimal initialBalance){

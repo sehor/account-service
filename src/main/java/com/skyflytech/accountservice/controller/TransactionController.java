@@ -2,6 +2,7 @@ package com.skyflytech.accountservice.controller;
 
 import com.mongodb.client.result.DeleteResult;
 import com.skyflytech.accountservice.domain.Transaction;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -38,13 +39,15 @@ import java.util.Map;
 public class TransactionController {
 
     private final TransactionService transactionService;
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final MongoOperations mongoOperations;
 
     @Value("${spring.profiles.active}")
     private String activeProfile;
     @Autowired
-    public TransactionController(TransactionService transactionService, MongoOperations mongoOperations) {
+    public TransactionController(TransactionService transactionService, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.transactionService = transactionService;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.mongoOperations = mongoOperations;
     }
 
@@ -57,7 +60,7 @@ public class TransactionController {
     })
     @GetMapping("/all")
     public ResponseEntity<List<Transaction>> getAllTransactions() {
-        List<Transaction> transactions = transactionService.getAllTransactions();
+        List<Transaction> transactions = transactionService.getAllTransactions(currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok(transactions);
     }
 
@@ -71,7 +74,7 @@ public class TransactionController {
     })
     @GetMapping("/search")
     public ResponseEntity<List<Transaction>> searchTransactions(@RequestParam("query") String query) {
-        List<Transaction> transactions = transactionService.searchTransactions(query);
+        List<Transaction> transactions = transactionService.searchTransactions(currentAccountSetIdHolder.getCurrentAccountSetId(),query);
         return ResponseEntity.ok(transactions);
     }
 

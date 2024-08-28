@@ -51,11 +51,11 @@ public enum AccountType {
     }
 
     public static List<AccountType> getEquityTypes() {
-        return Arrays.asList(EQUITY);
+        return List.of(EQUITY);
     }
 
     public static List<AccountType> getCostTypes() {
-        return Arrays.asList(COST);
+        return List.of(COST);
     }
 
     public static List<AccountType> getPeriodProfitLossTypes() {

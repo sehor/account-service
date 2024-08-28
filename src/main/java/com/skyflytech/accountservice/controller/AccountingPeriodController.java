@@ -4,7 +4,10 @@ import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.service.AccountingPeriodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,8 +16,12 @@ import java.util.Map;
 @RequestMapping("/api/accounting-periods")
 public class AccountingPeriodController {
 
+
+    private final AccountingPeriodService accountingPeriodService;
     @Autowired
-    private AccountingPeriodService accountingPeriodService;
+    public AccountingPeriodController(AccountingPeriodService accountingPeriodService) {
+        this.accountingPeriodService = accountingPeriodService;
+    }
 
     @PostMapping("/{accountingPeriodId}/close")
     public ResponseEntity<?> closeAccountingPeriod(@PathVariable String accountingPeriodId) {

@@ -8,8 +8,8 @@ import com.skyflytech.accountservice.domain.account.AccountType;
 import com.skyflytech.accountservice.domain.account.AccountingDirection;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.repository.AccountMongoRepository;
-import com.skyflytech.accountservice.repository.TransactionMongoRepository;
 import com.skyflytech.accountservice.repository.AccountingPeriodRepository;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +29,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
-import java.util.Map.Entry;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.function.Function;
 
 import static com.mongodb.internal.authentication.AwsCredentialHelper.LOGGER;
 
@@ -41,24 +39,24 @@ import static com.mongodb.internal.authentication.AwsCredentialHelper.LOGGER;
 public class AccountService {
 
     private final AccountMongoRepository accountMongoRepository;
-    private final TransactionMongoRepository transactionMongoRepository;
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final MongoTemplate mongoTemplate;
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
     @Autowired
     public AccountService(AccountMongoRepository accountMongoRepository, 
-                          TransactionMongoRepository transactionMongoRepository,
                           AccountingPeriodRepository accountingPeriodRepository,
-                          MongoTemplate mongoTemplate) {
+                          MongoTemplate mongoTemplate,
+                          CurrentAccountSetIdHolder currentAccountSetIdHolder) {
 
         this.accountMongoRepository = accountMongoRepository;
-        this.transactionMongoRepository = transactionMongoRepository;
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
     @Transactional
-    public List<Account> extractAccountsFromExcel(InputStream inputStream) {
+    public void extractAccountsFromExcel(InputStream inputStream) {
         List<Account> accounts = new ArrayList<>();
 
         Workbook workbook = null;
@@ -95,16 +93,14 @@ public class AccountService {
         List<Account> saved = accountMongoRepository.saveAll(accounts);
         updateAccountHierarchy(saved);
         //save again  after set parentId
-        saved=accountMongoRepository.saveAll(saved);
-        return saved;
+        accountMongoRepository.saveAll(saved);
     }
 
 
-    public List<Account> getAllAccounts() {
+    public List<Account> getAllAccounts(String accountSetId) {
 
 
-        List<Account> accounts = accountMongoRepository.findAll();
-
+        List<Account> accounts = mongoTemplate.find(Query.query(Criteria.where("accountSetId").is(accountSetId)), Account.class);
         if (accounts.isEmpty()) {
             LOGGER.info("No accounts found.");
             return List.of(); // Return an immutable empty list if no accounts are found
@@ -119,6 +115,8 @@ public class AccountService {
 
 
     public Account saveOrCreateAccount(Account account) {
+        //check accountSetId
+        checkAccountSetId(account);
         // 这里可以添加一些验证或其他处理逻辑
         if(!Utils.isNotEmpty(account.getParentId())){
             String parentCode = findParentCode(account.getCode());
@@ -133,17 +131,9 @@ public class AccountService {
         return accountMongoRepository.save(account);
     }
 
-    @Transactional
-    public Account saveAndInheritTransactions(Account account, String parentId) {
-        Account saved = accountMongoRepository.save(account);
-        
-        mongoTemplate.updateMulti(new Query(Criteria.where("accountId").is(account.getId())),
-                new Update().set("accountId", account.getId()),
-                Transaction.class);//transfer all transactions to first child
-        return saved;
-    }
-
     public void updateAccount(Account updatedAccount) {
+        //check accountSetId
+        checkAccountSetId(updatedAccount);
         if(!Utils.isNotEmpty(updatedAccount.getId())){
             throw new NotAcceptableStatusException("try to update account,but its id is null!");
         }
@@ -156,6 +146,8 @@ public class AccountService {
         if (Utils.isNotNullOrEmpty(accountMongoRepository.findByParentId(id))) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The account has children, not allowed to delete.");
         }
+        //check accountSetId
+        checkAccountSetId(account);
         if (Utils.isNotNullOrEmpty(mongoTemplate.find(Query.query(Criteria.where("accountId").is(id)), Transaction.class))) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The account has transactions, not allowed to delete.");
         }
@@ -164,10 +156,14 @@ public class AccountService {
 
 
     /*fuzzy search by name or code*/
-    public List<Account> searchAccounts(String query) {
-        // 假设 MongoDB 中有一个 `name` 字段需要匹配查询条件
-        Pattern pattern = Pattern.compile(Pattern.quote(query));
-        return accountMongoRepository.findByQuery(pattern.pattern());
+    public List<Account> searchAccounts(String search,String accountSetId) {
+        // MongoDB 中有一个 `name`或者`code` 字段需要匹配查询条件
+        Pattern pattern = Pattern.compile(Pattern.quote(search));
+        Query query=Query.query(Criteria.where("accountSetId").is(accountSetId));
+        query.addCriteria(Criteria.where("name").regex(pattern));
+        query.addCriteria(Criteria.where("code").regex(pattern));
+        return mongoTemplate.find(query, Account.class);
+     
     }
 
     public List<Account> getLeafSubAccounts(String accountId) {
@@ -181,10 +177,7 @@ public class AccountService {
             
             if (directSubAccounts.isEmpty()) {
                 // 这是一个叶子节点，包括初始的账户
-                Account leafAccount = accountMongoRepository.findById(currentId).orElse(null);
-                if (leafAccount != null) {
-                    leafSubAccounts.add(leafAccount);
-                }
+                accountMongoRepository.findById(currentId).ifPresent(leafSubAccounts::add);
             } else {
                 directSubAccounts.forEach(account -> queue.offer(account.getId()));
             }
@@ -305,13 +298,9 @@ public class AccountService {
     public List<Account> getLeafAccounts(List<Account> allAccounts) {
         // 创建一个Set来存储所有的父账户ID
         Set<String> parentIds = new HashSet<>();
-        
-        // 创建一个Map来存储所有账户，以ID为键
-        Map<String, Account> accountMap = new HashMap<>();
-        
+
         // 第一次遍历：填充parentIds和accountMap
         for (Account account : allAccounts) {
-            accountMap.put(account.getId(), account);
             if (account.getParentId() != null) {
                 parentIds.add(account.getParentId());
             }
@@ -355,5 +344,15 @@ public class AccountService {
         }
 
         return allBalances;
+    }
+
+    private void checkAccountSetId(Account account){
+        String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId();
+        if(account.getAccountSetId()==null){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is null.");
+        }
+        if(!account.getAccountSetId().equals(accountSetId)){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
+        }
     }
 }

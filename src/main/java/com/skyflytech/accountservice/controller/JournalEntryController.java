@@ -2,10 +2,10 @@ package com.skyflytech.accountservice.controller;
 
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.service.JournalEntryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +22,14 @@ import java.util.List;
 public class JournalEntryController {
 
     private final JournalEntryService journalEntryService;
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     @Value("${spring.profiles.active}")
     private String activeProfile;
 
     @Autowired
-    public JournalEntryController(JournalEntryService journalEntryService, MongoOperations mongoOperations) {
+    public JournalEntryController(JournalEntryService journalEntryService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.journalEntryService = journalEntryService;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
     @PostMapping("/process")
@@ -42,7 +44,7 @@ public class JournalEntryController {
     @GetMapping("/all")
     public ResponseEntity<List<JournalEntry>> allJournalEntry(){
 
-        return ResponseEntity.ok().body(journalEntryService.getAllJournalEntries());
+        return ResponseEntity.ok().body(journalEntryService.getAllJournalEntries(currentAccountSetIdHolder.getCurrentAccountSetId()));
     }
 
     //warn : just for developing stage and test
@@ -52,7 +54,7 @@ public class JournalEntryController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     try {
-        journalEntryService.deleteAllEntry();
+        journalEntryService.deleteAllEntry(currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok("deleted  records successfully!");
     }catch (Exception e){
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(e.getMessage());

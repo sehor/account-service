@@ -9,7 +9,6 @@ import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.repository.AccountingPeriodRepository;
-import com.skyflytech.accountservice.repository.TransactionMongoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,17 +24,18 @@ import java.util.Map;
 @Service
 public class AccountingPeriodService {
 
-    @Autowired
-    private AccountingPeriodRepository accountingPeriodRepository;
+    private final AccountingPeriodRepository accountingPeriodRepository;
+
+    private final AccountService accountService;
+
+    private  final JournalEntryService journalEntryService;
 
     @Autowired
-    private TransactionMongoRepository transactionRepository;
-
-    @Autowired
-    private AccountService accountService;
-
-    @Autowired
-    private JournalEntryService journalEntryService;
+    public AccountingPeriodService(AccountingPeriodRepository accountingPeriodRepository, AccountService accountService, JournalEntryService journalEntryService) {
+        this.accountingPeriodRepository = accountingPeriodRepository;
+        this.accountService = accountService;
+        this.journalEntryService = journalEntryService;
+    }
 
     @Transactional
     public AccountingPeriod closeAccountingPeriod(String accountingPeriodId) {
@@ -73,7 +73,8 @@ public class AccountingPeriodService {
     private void transferPeriod(AccountingPeriod period, Map<String, BigDecimal> balances) {
         String accountSetId = period.getAccountSetId();
         LocalDate endDate = period.getEndDate();
-        List<Account> allAccounts = accountService.getAllAccounts();
+        List<Account> allAccounts = accountService.getAllAccounts(accountSetId);
+
 
         // 找到"本年利润"科目
         Account profitAccount = allAccounts.stream()

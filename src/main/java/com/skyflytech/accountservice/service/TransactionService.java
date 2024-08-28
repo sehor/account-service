@@ -4,27 +4,21 @@ import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.repository.TransactionMongoRepository;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.AbstractMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -36,33 +30,26 @@ import java.util.stream.Collectors;
 public class TransactionService {
     private final TransactionMongoRepository transactionRepository;
     private final MongoOperations mongoOperations;
-    @Autowired
-    private AccountService accountService;
+    private final AccountService accountService;
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
     @Autowired
-    public TransactionService(TransactionMongoRepository transactionRepository, MongoOperations mongoOperations) {
+    public TransactionService(TransactionMongoRepository transactionRepository, MongoOperations mongoOperations,CurrentAccountSetIdHolder currentAccountSetIdHolder,AccountService accountService) {  
+
         this.transactionRepository = transactionRepository;
         this.mongoOperations = mongoOperations;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
+        this.accountService = accountService;
     }
 
-    public List<Transaction> getAllTransactions() {
-        return transactionRepository.findAll();
-    }
-
-    public List<Transaction> findByPeriod(String accountId,LocalDateTime start,LocalDateTime end){
-       return mongoOperations.find(Query.query(Criteria.where("accountId").is(accountId).and("modifiedDate").gte(start).lte(end)),
-                Transaction.class);
-    }
-
-    public double getPreviousDebit(Account account, LocalDateTime date){
-        //todo
-        return 0;
+    public List<Transaction> getAllTransactions(String accountSetId) {
+        return mongoOperations.find(Query.query(Criteria.where("accountSetId").is(accountSetId)), Transaction.class);
     }
 
 
     // Fuzzy search transactions by description
-    public List<Transaction> searchTransactions(String query) {
-        return transactionRepository.findByDescriptionContainingIgnoreCase(query);
+    public List<Transaction> searchTransactions(String query,String accountSetId) {
+        return mongoOperations.find(Query.query(Criteria.where("accountSetId").is(accountSetId).and("description").regex(query, "i")), Transaction.class);
     }
 
     public List<Transaction> findByAccountId(String accountId) {
@@ -115,30 +102,40 @@ public class TransactionService {
 
         @Transactional
     protected Transaction saveTransaction(Transaction transaction) {
+        checkAccountSetId(transaction);
         return transactionRepository.save(transaction);
     }
 
     protected void deleteByJourneyEntry(JournalEntry entry) {
-
+        //check entry's accountSetId
+        if(entry.getAccountSetId()==null){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is null.");
+        }
+        if(!entry.getAccountSetId().equals(currentAccountSetIdHolder.getCurrentAccountSetId())){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
+        }   
         Set<String> transactionIds = entry.getTransactionIds();
         mongoOperations.findAllAndRemove(new Query(Criteria.where("id").in(transactionIds)),
                                            Transaction.class);
     }
 
-    @Transactional
-    protected void updateTransactionsByAccountId(String accountId, String new_accountId) {
-        mongoOperations.updateMulti(new Query(Criteria.where("accountId").is(accountId)),
-                new Update().set("accountId", new_accountId),
-                Transaction.class);
-    }
-
     protected void deleteTransaction(String transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId).orElse(null);
-        if(transaction==null){
-            return;
-        }
+        checkAccountSetId(transaction);
         transactionRepository.delete(transaction);
     }
+    
+
+        private void checkAccountSetId(Transaction transaction){
+        if(transaction==null) throw new NoSuchElementException("no such transaction");
+        String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId();
+        if(transaction.getAccountSetId()==null){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is null.");
+        }
+        if(!transaction.getAccountSetId().equals(accountSetId)){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
+        }
+        }
 
 
 }

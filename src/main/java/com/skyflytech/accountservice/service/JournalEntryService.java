@@ -4,10 +4,13 @@ import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
 import com.skyflytech.accountservice.repository.EntryMongoRepository;
+import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -24,17 +27,20 @@ public class JournalEntryService {
 
     private final EntryMongoRepository journalEntryRepository;
     private final TransactionService transactionService;
+    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
     @Autowired
-    public JournalEntryService(EntryMongoRepository journalEntryRepository, TransactionService transactionService) {
+    public JournalEntryService(EntryMongoRepository journalEntryRepository, TransactionService transactionService,CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.journalEntryRepository = journalEntryRepository;
         this.transactionService = transactionService;
+        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
 
     @Transactional(rollbackFor = Exception.class)
     public JournalEntryView processJournalEntryView(JournalEntryView journalEntryView) {
         JournalEntry journalEntry = journalEntryView.getJournalEntry();
+        checkAccountSetId(journalEntry);
         List<Transaction> transactions_new = new ArrayList<>();
 
         //更新journalEntry Id
@@ -47,6 +53,7 @@ public class JournalEntryService {
                 // 如果Transaction的ID为空，表示需要新建Transaction
                 transaction.setCreatedDate(journalEntry.getCreatedDate());
                 transaction.setModifiedDate(journalEntry.getModifiedDate());
+                transaction.setAccountSetId(journalEntry.getAccountSetId());
             } else {
                 // 如果Transaction的ID不为空，表示需要更新Transaction
                 transaction.setModifiedDate(journalEntry.getModifiedDate());
@@ -73,27 +80,14 @@ public class JournalEntryService {
 
     @Transactional
     public void deleteEntry(JournalEntry journalEntry) {
-
+        checkAccountSetId(journalEntry);
         transactionService.deleteByJourneyEntry(journalEntry);
         journalEntryRepository.delete(journalEntry);
     }
-    public List<JournalEntry> getAllJournalEntries() {
-        return journalEntryRepository.findAll();
+    public List<JournalEntry> getAllJournalEntries(String accountSetId) {
+        return journalEntryRepository.findAllByAccountSetId(accountSetId);
     }
 
-    public JournalEntry getJournalEntryById(String id) {
-        return journalEntryRepository.findById(id).orElseThrow(()->new NoSuchElementException("no such JournalEntry founded: "+id));
-    }
-
-
-    public JournalEntry creatAndSaveJournalEntry(JournalEntry entry){
-        if(!Utils.isNotEmpty(entry.getId())){
-            entry.setId(UUID.randomUUID().toString());
-            entry.setCreatedDate(LocalDate.now());
-        }
-        entry.setModifiedDate(LocalDate.now());
-        return journalEntryRepository.save(entry);
-    }
 
     private void setNewJournalEntryBeforeSave(JournalEntry journalEntry) {
         LocalDate now=LocalDate.now();
@@ -102,9 +96,19 @@ public class JournalEntryService {
         journalEntry.setModifiedDate(now);
     }
 
-    public void deleteAllEntry() {
-        for(JournalEntry entry:getAllJournalEntries()){
+    public void deleteAllEntry(String accountSetId) {
+        for(JournalEntry entry:getAllJournalEntries(accountSetId)){
              deleteEntry(entry);
+        }
+    }
+
+    private void checkAccountSetId(JournalEntry journalEntry){
+        String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId();
+        if(journalEntry.getAccountSetId()==null){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is null.");
+        }
+        if(!journalEntry.getAccountSetId().equals(accountSetId)){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
         }
     }
 }

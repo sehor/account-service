@@ -35,8 +35,8 @@ public final class GlobalConst {
         Map<TransferAccountType, List<AccountType>> tempMap = new EnumMap<>(TransferAccountType.class);
         tempMap.put(TransferAccountType.INCOME, Arrays.asList(AccountType.OPERATING_REVENUE, AccountType.OTHER_INCOME));
         tempMap.put(TransferAccountType.COST_AND_EXPENSE, Arrays.asList(AccountType.COST, AccountType.OPERATING_COST_TAX, AccountType.PERIOD_EXPENSE));
-        tempMap.put(TransferAccountType.NON_OPERATING_EXPENSE, Arrays.asList(AccountType.OTHER_EXPENSE));
-        tempMap.put(TransferAccountType.PRIOR_YEAR_ADJUSTMENT, Arrays.asList(AccountType.PRIOR_YEAR_ADJUSTMENT));
+        tempMap.put(TransferAccountType.NON_OPERATING_EXPENSE, List.of(AccountType.OTHER_EXPENSE));
+        tempMap.put(TransferAccountType.PRIOR_YEAR_ADJUSTMENT, List.of(AccountType.PRIOR_YEAR_ADJUSTMENT));
 
         AUTO_TRANSFER_ACCOUNTS = Collections.unmodifiableMap(tempMap);
     }
