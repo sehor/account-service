@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 /**
  * @Author pzr
@@ -33,11 +35,11 @@ public class JournalEntryController {
     }
 
     @PostMapping("/process")
-    public ResponseEntity<JournalEntryView> processJournalEntryView(@RequestBody JournalEntryView journalEntryView) {
+    public ResponseEntity<?> processJournalEntryView(@RequestBody JournalEntryView journalEntryView) {
         try {
             return ResponseEntity.ok().body(journalEntryService.processJournalEntryView(journalEntryView));
         }catch (Exception e){
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
 
@@ -63,4 +65,18 @@ public class JournalEntryController {
 
 
     }
+
+    @GetMapping("/byDateRange")
+    public ResponseEntity<?> getJournalEntriesByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId();
+            List<JournalEntryView> entries = journalEntryService.getJournalEntriesByPeriod(accountSetId, startDate, endDate);
+            return ResponseEntity.ok(entries);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
 }

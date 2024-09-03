@@ -25,6 +25,9 @@ class AccountingPeriodServiceTest {
     @InjectMocks
     private AccountingPeriodService accountingPeriodService;
 
+    @InjectMocks
+    private CloseAccountingPeriodService closeAccountingPeriodService;
+
     @Mock
     private AccountingPeriodRepository accountingPeriodRepository;
 
@@ -65,7 +68,7 @@ class AccountingPeriodServiceTest {
         when(accountingPeriodRepository.save(any(AccountingPeriod.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // 执行测试
-        AccountingPeriod newPeriod = accountingPeriodService.closeAccountingPeriod(accountingPeriodId);
+        AccountingPeriod newPeriod = closeAccountingPeriodService.closeAccountingPeriod(accountingPeriodId);
 
         // 验证结果
         assertNotNull(newPeriod);
@@ -84,7 +87,7 @@ class AccountingPeriodServiceTest {
         when(accountingPeriodRepository.findById(anyString())).thenReturn(Optional.empty());
 
         // 执行测试并验证异常
-        assertThrows(RuntimeException.class, () -> accountingPeriodService.closeAccountingPeriod("nonExistentId"));
+        assertThrows(RuntimeException.class, () -> closeAccountingPeriodService.closeAccountingPeriod("nonExistentId"));
     }
 
     @Test
@@ -97,7 +100,7 @@ class AccountingPeriodServiceTest {
         when(accountingPeriodRepository.findById(anyString())).thenReturn(Optional.of(closedPeriod));
 
         // 执行测试并验证异常
-        assertThrows(RuntimeException.class, () -> accountingPeriodService.closeAccountingPeriod("closedPeriodId"));
+        assertThrows(RuntimeException.class, () -> closeAccountingPeriodService.closeAccountingPeriod("closedPeriodId"));
     }
 
     // 可以添加更多测试方法，如测试会计恒等式检查、创建初始期间等

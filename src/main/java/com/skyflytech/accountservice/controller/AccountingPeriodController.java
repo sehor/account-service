@@ -2,6 +2,8 @@ package com.skyflytech.accountservice.controller;
 
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.service.AccountingPeriodService;
+import com.skyflytech.accountservice.service.CloseAccountingPeriodService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,17 +18,16 @@ import java.util.Map;
 @RequestMapping("/api/accounting-periods")
 public class AccountingPeriodController {
 
-
-    private final AccountingPeriodService accountingPeriodService;
+    private final CloseAccountingPeriodService closeAccountingPeriodService;    
     @Autowired
-    public AccountingPeriodController(AccountingPeriodService accountingPeriodService) {
-        this.accountingPeriodService = accountingPeriodService;
+    public AccountingPeriodController(CloseAccountingPeriodService closeAccountingPeriodService, AccountingPeriodService accountingPeriodService) {
+        this.closeAccountingPeriodService = closeAccountingPeriodService;
     }
 
     @PostMapping("/{accountingPeriodId}/close")
     public ResponseEntity<?> closeAccountingPeriod(@PathVariable String accountingPeriodId) {
         try {
-            AccountingPeriod newPeriod = accountingPeriodService.closeAccountingPeriod(accountingPeriodId);
+            AccountingPeriod newPeriod = closeAccountingPeriodService.closeAccountingPeriod(accountingPeriodId);
             return ResponseEntity.ok(newPeriod);
         } catch (RuntimeException e) {
             Map<String, String> errorResponse = new HashMap<>();

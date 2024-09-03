@@ -39,6 +39,8 @@ public class Account implements AccountSetIdAware{
 
     private BigDecimal initialBalance=BigDecimal.ZERO;
 
+    private Integer level;
+
     public Account(String code, String name, String accountSetId, AccountType type, String parentId, AccountingDirection balanceDirection, AccountState state) {
         this.code = code;
         this.name = name;

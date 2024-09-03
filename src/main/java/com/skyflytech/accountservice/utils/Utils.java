@@ -3,8 +3,6 @@ package com.skyflytech.accountservice.utils;
 import java.util.Collection;
 import java.util.Objects;
 
-import com.skyflytech.accountservice.global.GlobalConst;
-
 /**
  * @Author pzr
  * @date:2024-08-19-7:57

@@ -7,6 +7,9 @@ import com.skyflytech.accountservice.repository.EntryMongoRepository;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,14 +31,18 @@ public class JournalEntryService {
     private final EntryMongoRepository journalEntryRepository;
     private final TransactionService transactionService;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
+    private final MongoTemplate mongoTemplate;
 
     @Autowired
-    public JournalEntryService(EntryMongoRepository journalEntryRepository, TransactionService transactionService,CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public JournalEntryService(EntryMongoRepository journalEntryRepository, 
+                               TransactionService transactionService,
+                               CurrentAccountSetIdHolder currentAccountSetIdHolder,
+                               MongoTemplate mongoTemplate) {
         this.journalEntryRepository = journalEntryRepository;
         this.transactionService = transactionService;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
+        this.mongoTemplate = mongoTemplate;
     }
-
 
     @Transactional(rollbackFor = Exception.class)
     public JournalEntryView processJournalEntryView(JournalEntryView journalEntryView) {
@@ -86,6 +93,36 @@ public class JournalEntryService {
     }
     public List<JournalEntry> getAllJournalEntries(String accountSetId) {
         return journalEntryRepository.findAllByAccountSetId(accountSetId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<JournalEntryView> getJournalEntriesByPeriod(String accountSetId, LocalDate startDate, LocalDate endDate) {
+        // 获取指定日期范围内的所有记账凭证
+        List<JournalEntry> journalEntries = journalEntryRepository.findByAccountSetIdAndModifiedDateBetween(accountSetId, startDate, endDate);
+        
+        // 收集所有交易ID
+        Set<String> allTransactionIds = journalEntries.stream()
+                .flatMap(je -> je.getTransactionIds().stream())
+                .collect(Collectors.toSet());
+
+        // 批量查询所有相关交易
+        Query query = new Query(Criteria.where("_id").in(allTransactionIds));
+        List<Transaction> allTransactions = mongoTemplate.find(query, Transaction.class);
+
+        // 创建交易ID到交易对象的映射
+        Map<String, Transaction> transactionMap = allTransactions.stream()
+                .collect(Collectors.toMap(Transaction::getId, t -> t));
+
+        // 构建JournalEntryView列表
+        return journalEntries.stream()
+                .map(journalEntry -> {
+                    List<Transaction> transactions = journalEntry.getTransactionIds().stream()
+                            .map(transactionMap::get)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
+                    return new JournalEntryView(journalEntry, transactions);
+                })
+                .collect(Collectors.toList());
     }
 
 

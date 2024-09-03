@@ -4,7 +4,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
-import org.springframework.data.mongodb.config.EnableMongoAuditing;
 
 /**
  * @Author pzr
@@ -12,7 +11,7 @@ import org.springframework.data.mongodb.config.EnableMongoAuditing;
  * @Description:
  **/
 @Configuration
-@EnableMongoAuditing
+//@EnableMongoAuditing
 public class MongoDBConfig {
 
     // 事务管理器

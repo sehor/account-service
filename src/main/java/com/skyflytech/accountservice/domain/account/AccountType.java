@@ -19,7 +19,7 @@ public enum AccountType {
     OTHER_INCOME("其他收益"),
     OPERATING_COST_TAX("营业成本及税金"),
     OTHER_EXPENSE("其他损失"),
-    PERIOD_EXPENSE("期间损益"), // 修改这里
+    PERIOD_EXPENSE("期间费用"), // 修改这里
     INCOME_TAX("所得税"),
     PRIOR_YEAR_ADJUSTMENT("以前年度损益调整");
 

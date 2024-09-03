@@ -17,6 +17,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.math.BigDecimal;
+import java.util.Map;
+
 
 
 @Tag(name = "account")
@@ -80,7 +83,8 @@ public class AccountController {
 
     @PostMapping("/create")
     public ResponseEntity<APIResponse<Account>> createAccount(@RequestBody Account account) {
-        Account create = accountService.saveOrCreateAccount(account);
+        account.setAccountSetId(getAccountSetId());
+        Account create = accountService.createAccount(account);
         if(create==null){
             return ResponseEntity.badRequest().body(null);
         }
@@ -88,10 +92,10 @@ public class AccountController {
     }
 
     @PutMapping("/update")
-    public ResponseEntity<String> updateAccount( @RequestBody Account account) {
+    public ResponseEntity<?> updateAccount( @RequestBody Account account) {
         try {
-            accountService.updateAccount(account);
-            return ResponseEntity.ok("Account updated successfully.");
+            Account updatedAccount = accountService.updateAccount(account);
+            return ResponseEntity.ok(updatedAccount);
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Account not found.");
         }
@@ -139,5 +143,15 @@ public class AccountController {
     //get accountSetId
     private String getAccountSetId(){
         return currentAccountSetIdHolder.getCurrentAccountSetId();
+    }
+
+    @PostMapping("/initializeOpeningBalances")
+    public ResponseEntity<?> initializeOpeningBalances(
+            @RequestBody Map<String, BigDecimal> openingBalances) {
+   
+            String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId(); //for test
+            accountService.initializeOpeningBalances(accountSetId, openingBalances);
+            return ResponseEntity.ok("初始化成功");
+      
     }
 }

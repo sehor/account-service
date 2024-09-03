@@ -15,10 +15,11 @@ public final class GlobalConst {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
-    //科目编号(id)结构XXXX-XXXX-XXX-XXX
-    public static final int[] ACCOUNT_Code_LENGTH = {4, 4, 3, 3};
+    //科目编号的位数
+    public static final int[] ACCOUNT_Code_LENGTH = {4, 8, 11, 14};
+    //科目位数对应的级次map
+    public static final Map<Integer, Integer> ACCOUNT_CODE_LEVEL_MAP = Map.of(4, 1, 8, 2, 11, 3, 14, 4);
 
-    public static final String ACCOUNT_SET_ID_FOR_TEST = "accountSetIdForTest";
 
     // 本年利润科目代码
     public static final String CURRENT_YEAR_PROFIT_CODE = "3103";
