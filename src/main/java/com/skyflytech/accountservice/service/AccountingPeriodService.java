@@ -1,6 +1,7 @@
 package com.skyflytech.accountservice.service;
 
 import com.skyflytech.accountservice.domain.AccountAmountHolder;
+import com.skyflytech.accountservice.domain.AccountSet;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
@@ -19,8 +20,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
@@ -45,8 +48,19 @@ public class AccountingPeriodService {
         initialPeriod.setAccountSetId(accountSetId);
         initialPeriod.setName(generatePeriodName(startMonth));
         initialPeriod.setStartDate(startMonth.atDay(1));
-        initialPeriod.setEndDate(startMonth.atEndOfMonth());// 初始余额为空
+        initialPeriod.setEndDate(startMonth.atEndOfMonth());
         initialPeriod.setClosed(false);
+        AccountSet accountSet=mongoTemplate.findById(accountSetId, AccountSet.class);
+        if(accountSet==null){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "AccountSet not found");
+        }
+        for(Entry<String,BigDecimal> entry:accountSet.getInitialAccountBalance().entrySet()){
+            AccountAmountHolder accountAmountHolder=new AccountAmountHolder();
+            accountAmountHolder.setBalance(entry.getValue());
+            accountAmountHolder.setTotalCredit(BigDecimal.ZERO);
+            accountAmountHolder.setTotalDebit(BigDecimal.ZERO);
+            initialPeriod.getAmountHolders().put(entry.getKey(), accountAmountHolder);
+        }
 
         return accountingPeriodRepository.save(initialPeriod);
     }

@@ -10,7 +10,11 @@ import org.springframework.data.mongodb.core.index.Indexed;
 
 import jakarta.validation.constraints.NotBlank;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @Author pzr
@@ -20,7 +24,6 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Document(collection = "account_sets")
 public class AccountSet {
     @Id
@@ -33,6 +36,8 @@ public class AccountSet {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    private Map<String,BigDecimal> initialAccountBalance=new HashMap<>();
 
     // ... 其他字段和方法 ...
 }

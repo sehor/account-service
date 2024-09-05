@@ -16,6 +16,8 @@ public interface AccountingPeriodRepository extends MongoRepository<AccountingPe
 
     Optional<AccountingPeriod> findByAccountSetIdAndStartDate(String accountSetId, LocalDate periodStartDate);
 
+    List<AccountingPeriod> findByAccountSetId(String accountSetId);
+
    
 
 }

@@ -1,6 +1,7 @@
 package com.skyflytech.accountservice.service;
 
 import com.skyflytech.accountservice.domain.AccountAmountHolder;
+import com.skyflytech.accountservice.domain.AccountSet;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
@@ -339,13 +340,47 @@ public class AccountService {
         if (accountSetId == null || !accountSetId.equals(currentAccountSetIdHolder.getCurrentAccountSetId())) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match.");
         }
-        // update initialBalances
+        //find accountSet
+        AccountSet accountSet=mongoTemplate.findById(accountSetId, AccountSet.class);
+        if(accountSet==null){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "AccountSet not found");
+        }
+        //changes of accountSet initialAccountBalance items
+        Map<String,BigDecimal> changes=new HashMap<>();
         for (Map.Entry<String, BigDecimal> entry : openingBalances.entrySet()) {
             String accountId = entry.getKey();
-            BigDecimal balance = entry.getValue();
-            mongoTemplate.updateFirst(Query.query(Criteria.where("id").is(accountId)),
-                    Update.update("initialBalance", balance), Account.class);
+            BigDecimal oldBalance=accountSet.getInitialAccountBalance().get(accountId);
+            if(oldBalance==null){
+                //add new item
+                accountSet.getInitialAccountBalance().put(accountId, entry.getValue());
+                changes.put(accountId, entry.getValue());
+            }else{
+                BigDecimal change = entry.getValue().subtract(oldBalance);
+                changes.put(accountId, change);
+            }   
         }
+        // update all following accountingPeriods
+        List<AccountingPeriod> accountingPeriods = accountingPeriodRepository.findByAccountSetId(accountSetId);
+        for (AccountingPeriod accountingPeriod : accountingPeriods) {
+            for (Map.Entry<String, BigDecimal> entry : changes.entrySet()) {
+                AccountAmountHolder accountAmountHolder = accountingPeriod.getAmountHolders().get(entry.getKey());
+                if(accountAmountHolder!=null){
+                    accountAmountHolder.setBalance(accountAmountHolder.getBalance().add(entry.getValue()));
+                }else{
+                    //add new item
+                    accountAmountHolder = new AccountAmountHolder();
+                    accountAmountHolder.setBalance(entry.getValue());
+                    accountingPeriod.getAmountHolders().put(entry.getKey(), accountAmountHolder);
+                }
+            }   
+        }
+        //保存accountingPeriods改变
+        accountingPeriodRepository.saveAll(accountingPeriods);
+        //保存accountSet
+        for (Map.Entry<String, BigDecimal> entry : openingBalances.entrySet()) {
+            accountSet.getInitialAccountBalance().put(entry.getKey(), entry.getValue());
+        }
+        mongoTemplate.save(accountSet);
     }
 
     /**
