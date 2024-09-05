@@ -2,8 +2,7 @@ package com.skyflytech.accountservice.domain.account;
 
 public enum TransferAccountType {
     INCOME("收入"),
-    COST_AND_EXPENSE("成本和费用"),
-    NON_OPERATING_EXPENSE("营业外支出"),
+    ALL_EXPENSE_TYPES("营业成本和附加税-费用-损失-营业外支出-所得税"),
     PRIOR_YEAR_ADJUSTMENT("以前年度损益调整");
 
     private final String chineseName;

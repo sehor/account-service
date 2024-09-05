@@ -1,14 +1,16 @@
 package com.skyflytech.accountservice.service;
 
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
+import com.skyflytech.accountservice.repository.TransactionMongoRepository;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,26 +19,26 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.http.HttpStatus;
 @Service
 public class ProcessJournalEntry {
     private final MongoTemplate mongoTemplate;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final AccountingPeriodService accountingPeriodService;
+    private final TransactionMongoRepository transactionRepository;
 
-    public ProcessJournalEntry(MongoTemplate mongoTemplate, 
-                               CurrentAccountSetIdHolder currentAccountSetIdHolder, 
-                               AccountingPeriodService accountingPeriodService) {
+    public ProcessJournalEntry(MongoTemplate mongoTemplate,
+                               CurrentAccountSetIdHolder currentAccountSetIdHolder,
+                               AccountingPeriodService accountingPeriodService, TransactionMongoRepository transactionRepository) {
         this.mongoTemplate = mongoTemplate;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.accountingPeriodService = accountingPeriodService;
+        this.transactionRepository = transactionRepository;
     }
 
     @Transactional
     public JournalEntryView processJournalEntryView(JournalEntryView journalEntryView) {
         JournalEntry journalEntry = journalEntryView.getJournalEntry();
+        List<Transaction> transactions_new = new ArrayList<>();
 
         // 检查accountSetId
         if (journalEntry.getAccountSetId() == null
@@ -73,11 +75,13 @@ public class ProcessJournalEntry {
                     accountingPeriodService.updateAccountingPeriodsWhenTransactionAmountChange(transaction, debitChange, creditChange);
                 }
             }
-            mongoTemplate.save(transaction);
+            transactions_new.add(transaction);
         }
+       transactions_new= transactionRepository.saveAll(transactions_new);
+
 
         // 删除更新分录后那些已经不存在的entry transactionsIds
-        List<Transaction> transactions_new = new ArrayList<>();
+
         Set<String> transactionIds_new = transactions_new.stream().map(Transaction::getId).collect(Collectors.toSet());
 
         if (Utils.isNotNullOrEmpty(journalEntry.getTransactionIds())) {

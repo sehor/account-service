@@ -14,6 +14,9 @@ springdoc:
     - group: 'journalEntry'
       paths-to-match: "/api/journalEntries/** " # Only match endpoints with /transactions/
       packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+    - group: 'accountingPeriod'
+      paths-to-match: "/api/accounting-periods/** " # Only match endpoints with /transactions/
+      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
 
 # knife4j的增强配置，不需要增强可以不配
 knife4j:

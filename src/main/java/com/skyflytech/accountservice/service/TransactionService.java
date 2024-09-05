@@ -100,6 +100,7 @@ public class TransactionService {
         return new AbstractMap.SimpleEntry<>(totalDebit, totalCredit);
     }
 
+
         @Transactional
     protected Transaction saveTransaction(Transaction transaction) {
         checkAccountSetId(transaction);

@@ -38,16 +38,7 @@ public class JournalEntry  {
 
     private String accountingSupervisor;
 
-    private Set<String> transactionIds;
+    private Set<String> transactionIds=new HashSet<>();
 
-     public void addTransactionId(String TransactionId){
-         if(transactionIds==null){
-             transactionIds=new HashSet<>();
-         }
-         transactionIds.add(TransactionId);
-     }
-     public void deleteTransactionId(String transactionId){
-         this.transactionIds.remove(transactionId);
-     }
 
 }

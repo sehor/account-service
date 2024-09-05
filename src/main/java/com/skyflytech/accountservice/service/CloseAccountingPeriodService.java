@@ -1,5 +1,6 @@
 package com.skyflytech.accountservice.service;
 
+import com.skyflytech.accountservice.domain.AccountAmountHolder;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
@@ -9,7 +10,13 @@ import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.repository.AccountingPeriodRepository;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,23 +25,26 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class CloseAccountingPeriodService {
+    private static final Logger logger = LoggerFactory.getLogger(CloseAccountingPeriodService.class);
 
     private final AccountingPeriodRepository accountingPeriodRepository;
-    private final AccountService accountService;
-    private final JournalEntryService journalEntryService;
+    private final ProcessJournalEntry processJournalEntryService;
+    private final MongoTemplate mongoTemplate;
 
     @Autowired
     public CloseAccountingPeriodService(AccountingPeriodRepository accountingPeriodRepository,
-                                        AccountService accountService,
-                                        JournalEntryService journalEntryService) {
+                                        ProcessJournalEntry processJournalEntryService,
+                                        MongoTemplate mongoTemplate) {
         this.accountingPeriodRepository = accountingPeriodRepository;
-        this.accountService = accountService;
-        this.journalEntryService = journalEntryService;
+        this.processJournalEntryService = processJournalEntryService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Transactional
@@ -46,22 +56,22 @@ public class CloseAccountingPeriodService {
             throw new RuntimeException("该会计期间已经结账");
         }
 
-        // 计算所有账户的期末余额
-        YearMonth currentMonth = YearMonth.from(currentPeriod.getEndDate());
-        Map<String, BigDecimal> closingBalances = accountService.calculateAllAccountBalancesForMonth(currentPeriod.getAccountSetId(), currentMonth);
+        // 所有账户的期末余额
+        Map<String, BigDecimal> closingBalances = new HashMap<>();
+        for (Map.Entry<String, AccountAmountHolder> holderEntry:currentPeriod.getAmountHolders().entrySet()){
+            closingBalances.put(holderEntry.getKey(), holderEntry.getValue().getBalance());
+        }
 
-        // 1. 结转期间
+        // 1. 结转期间费用
         transferPeriod(currentPeriod, closingBalances);
 
-        // 2. 重新计算期末余额
-        Map<String, BigDecimal> updatedClosingBalances = accountService.calculateAllAccountBalancesForMonth(currentPeriod.getAccountSetId(), currentMonth);
-        currentPeriod.setClosingBalances(updatedClosingBalances);
+
 
         // 3. 检查会计恒等式
-        checkAccountingEquation(updatedClosingBalances);
+        checkAccountingEquation(closingBalances);
 
         // 4. 创建新的会计期间，并将当前期间的期末余额设置为新期间的期初余额
-        AccountingPeriod newPeriod = createNewAccountingPeriod(currentPeriod, updatedClosingBalances);
+        AccountingPeriod newPeriod = createNewAccountingPeriod(currentPeriod);
 
         // 标记当前期间为已关闭
         currentPeriod.setClosed(true);
@@ -70,44 +80,27 @@ public class CloseAccountingPeriodService {
         return newPeriod;
     }
 
-    private void transferPeriod(AccountingPeriod period, Map<String, BigDecimal> balances) {
+    @Transactional
+    public void transferPeriod(AccountingPeriod period, Map<String, BigDecimal> balances) {
         String accountSetId = period.getAccountSetId();
-        LocalDate endDate = period.getEndDate();
-        List<Account> allAccounts = accountService.getAllAccounts(accountSetId);
-
+        List<Account> allAccounts = findAllLeafAccountsForClosingPeriod(accountSetId);
         Account profitAccount = findAccountByCode(allAccounts, GlobalConst.CURRENT_YEAR_PROFIT_CODE);
-        Account undistributedProfitAccount = findAccountByCode(allAccounts, GlobalConst.UNDISTRIBUTED_PROFIT_CODE);
-
-        JournalEntryView journalEntryView = new JournalEntryView();
-        JournalEntry journalEntry = new JournalEntry();
-        journalEntry.setAccountSetId(accountSetId);
-        journalEntry.setCreatedDate(endDate);
-        journalEntry.setVoucherWord("结转");
-        journalEntryView.setJournalEntry(journalEntry);
-
-        List<Transaction> transactions = new ArrayList<>();
-        BigDecimal totalProfit = BigDecimal.ZERO;
-
-        for (Map.Entry<TransferAccountType, List<AccountType>> entry : GlobalConst.AUTO_TRANSFER_ACCOUNTS.entrySet()) {
-            TransferAccountType transferType = entry.getKey();
-            List<AccountType> accountTypes = entry.getValue();
-
-            BigDecimal totalAmount = processAccountTypes(allAccounts, accountTypes, balances, transactions, profitAccount, transferType);
-
-            if (totalAmount.compareTo(BigDecimal.ZERO) != 0) {
-                transactions.add(createTransaction(profitAccount, totalAmount, transferType == TransferAccountType.INCOME));
-                totalProfit = totalProfit.add(transferType == TransferAccountType.INCOME ? totalAmount : totalAmount.negate());
-            }
+       List<JournalEntryView> journalEntryViews = new ArrayList<>();
+       //结转收入
+       journalEntryViews.add(transferIncomeAccounts(findIncomeAccounts(allAccounts), period, profitAccount));
+       //结转费用和损失
+       journalEntryViews.add(transferExpenseAndLossAccounts(findExpenseAndLossAccounts(allAccounts), period, profitAccount));
+       //结转以前年度损益调整
+       journalEntryViews.add(transferPriorYearAdjustmentAccounts(findPriorYearAdjustmentAccounts(allAccounts), period, profitAccount));
+       //创建journalEntry
+      
+       for (JournalEntryView journalEntryView : journalEntryViews) {
+        if(journalEntryView!=null){
+            processJournalEntryService.processJournalEntryView(journalEntryView);
+        }else{
+            logger.info("凭证是空的");
         }
-
-        // 结转本年利润到未分配利润
-        if (totalProfit.compareTo(BigDecimal.ZERO) != 0) {
-            transactions.add(createTransaction(profitAccount, totalProfit, totalProfit.compareTo(BigDecimal.ZERO) > 0));
-            transactions.add(createTransaction(undistributedProfitAccount, totalProfit, totalProfit.compareTo(BigDecimal.ZERO) < 0));
-        }
-
-        journalEntryView.setTransactions(transactions);
-        journalEntryService.processJournalEntryView(journalEntryView);
+       }    
     }
 
     private Account findAccountByCode(List<Account> accounts, String code) {
@@ -115,33 +108,6 @@ public class CloseAccountingPeriodService {
                 .filter(account -> code.equals(account.getCode()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("未找到科目，代码: " + code));
-    }
-
-    private BigDecimal processAccountTypes(List<Account> allAccounts, List<AccountType> accountTypes, 
-                                           Map<String, BigDecimal> balances, List<Transaction> transactions, 
-                                           Account profitAccount, TransferAccountType transferType) {
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        for (Account account : accountService.getLeafAccounts(allAccounts)) {
-            if (accountTypes.contains(account.getType())) {
-                BigDecimal balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
-                totalAmount = totalAmount.add(balance);
-                transactions.add(createTransaction(account, balance, transferType != TransferAccountType.INCOME));
-            }
-        }
-        return totalAmount;
-    }
-
-    private Transaction createTransaction(Account account, BigDecimal amount, boolean isDebit) {
-        Transaction transaction = new Transaction();
-        transaction.setAccountId(account.getId());
-        if (isDebit) {
-            transaction.setDebit(amount);
-            transaction.setCredit(BigDecimal.ZERO);
-        } else {
-            transaction.setDebit(BigDecimal.ZERO);
-            transaction.setCredit(amount);
-        }
-        return transaction;
     }
 
     private void checkAccountingEquation(Map<String, BigDecimal> balances) {
@@ -156,16 +122,14 @@ public class CloseAccountingPeriodService {
         }
     }
 
-    private AccountingPeriod createNewAccountingPeriod(AccountingPeriod currentPeriod, Map<String, BigDecimal> closingBalances) {
+    private AccountingPeriod createNewAccountingPeriod(AccountingPeriod currentPeriod) {
         YearMonth nextMonth = YearMonth.from(currentPeriod.getEndDate()).plusMonths(1);
-        
         AccountingPeriod newPeriod = new AccountingPeriod();
         newPeriod.setAccountSetId(currentPeriod.getAccountSetId());
         newPeriod.setName(generateNextPeriodName(nextMonth));
         newPeriod.setStartDate(nextMonth.atDay(1));
         newPeriod.setEndDate(nextMonth.atEndOfMonth());
-        newPeriod.setOpeningBalances(closingBalances);
-        newPeriod.setClosingBalances(Map.of()); // 初始化为空Map
+        newPeriod.setAmountHolders(currentPeriod.getAmountHolders());
         newPeriod.setClosed(false);
 
         return accountingPeriodRepository.save(newPeriod);
@@ -174,4 +138,107 @@ public class CloseAccountingPeriodService {
     private String generateNextPeriodName(YearMonth yearMonth) {
         return yearMonth.format(DateTimeFormatter.ofPattern("yyyy年MM月"));
     }
+
+    private Transaction createTransaction(Account account, BigDecimal amount, boolean isDebit,String description) {
+        LocalDate now=LocalDate.now();
+        Transaction transaction = new Transaction();
+        transaction.setCreatedDate(now);
+        transaction.setModifiedDate(now);
+        transaction.setDescription(description);
+        transaction.setAccountId(account.getId());
+        if (isDebit) {
+            transaction.setDebit(amount);
+            transaction.setCredit(BigDecimal.ZERO);
+        } else {
+            transaction.setDebit(BigDecimal.ZERO);
+            transaction.setCredit(amount);
+        }
+        return transaction;
+    }
+
+    //create journalEntry
+    private JournalEntry createJournalEntry(String accountSetId, String voucherWord) {
+        JournalEntry journalEntry = new JournalEntry();
+        journalEntry.setAccountSetId(accountSetId);
+        LocalDate now=LocalDate.now();
+        journalEntry.setCreatedDate(now);
+        journalEntry.setModifiedDate(now);
+        journalEntry.setVoucherWord(voucherWord);
+        return journalEntry;
+    }
+        /**
+     * 查找所有需要期末结转的期间叶子账户
+     * @param accountSetId
+     * @return
+     **/
+    public List<Account> findAllLeafAccountsForClosingPeriod(String accountSetId) {
+      List<AccountType> accountTypes =  GlobalConst.AUTO_TRANSFER_ACCOUNTS.values().stream()
+      .flatMap(List::stream).toList();
+      List<String> accountTypeValues = accountTypes.stream().map(AccountType::name).collect(Collectors.toList());
+      List<Account> accounts = mongoTemplate.find(Query.query(Criteria.where("accountSetId").is(accountSetId)
+      .and("type").in(accountTypeValues)), Account.class);
+      List<String> parentIds = accounts.stream().map(Account::getParentId).toList();
+        return accounts.stream().filter(account->!parentIds.contains(account.getId())).collect(Collectors.toList());
+    }
+    //找到期间收入账户
+    public List<Account> findIncomeAccounts(List<Account> accounts) {
+        List<AccountType> accountTypes =  GlobalConst.AUTO_TRANSFER_ACCOUNTS.get(TransferAccountType.INCOME);
+        List<String> accountTypeValues = accountTypes.stream().map(AccountType::name).toList();
+        return accounts.stream().filter(account->accountTypeValues.contains(account.getType().name())).collect(Collectors.toList());
+    }
+    //找到期间费用和损失账户
+    public List<Account> findExpenseAndLossAccounts(List<Account> accounts) {
+        List<AccountType> accountTypes =  GlobalConst.AUTO_TRANSFER_ACCOUNTS.get(TransferAccountType.ALL_EXPENSE_TYPES);
+        List<String> accountTypeValues = accountTypes.stream().map(AccountType::name).toList();
+        return accounts.stream().filter(account->accountTypeValues.contains(account.getType().name())).collect(Collectors.toList());
+    }
+    //找到以前年度损益调整账户
+    public List<Account> findPriorYearAdjustmentAccounts(List<Account> accounts) {
+        List<AccountType> accountTypes =  GlobalConst.AUTO_TRANSFER_ACCOUNTS.get(TransferAccountType.PRIOR_YEAR_ADJUSTMENT);
+        List<String> accountTypeValues = accountTypes.stream().map(AccountType::name).collect(Collectors.toList());
+        return accounts.stream().filter(account->accountTypeValues.contains(account.getType().name())).collect(Collectors.toList());
+    } 
+
+    //结转收入账户
+    public JournalEntryView transferIncomeAccounts(List<Account> incomeAccounts, AccountingPeriod period,Account profitAccount) {
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        if(incomeAccounts.isEmpty()) return null;
+        List<Transaction> transactions = new ArrayList<>();
+        for (Account account : incomeAccounts) {
+            BigDecimal balance = period.getAmountHolders().get(account.getId()).getBalance();
+            totalAmount = totalAmount.add(balance);
+            transactions.add(createTransaction(account, balance, false, "结转收入"));
+        }
+        //create transaction for "本年利润"
+        createTransaction(profitAccount, totalAmount, true, "结转收入");
+        return new JournalEntryView(createJournalEntry(period.getAccountSetId(), "结转收入"), transactions);
+    }
+    //结转费用和损失账户
+    public JournalEntryView transferExpenseAndLossAccounts(List<Account> expenseAndLossAccounts, AccountingPeriod period,Account profitAccount) {
+        if(expenseAndLossAccounts.isEmpty()) return null;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<Transaction> transactions = new ArrayList<>();
+        for (Account account : expenseAndLossAccounts) {
+            BigDecimal balance = period.getAmountHolders().get(account.getId()).getBalance();
+            totalAmount = totalAmount.add(balance);
+            transactions.add(createTransaction(account, balance, false, "结转费用和损失"));
+        }
+        createTransaction(profitAccount, totalAmount, true, "结转费用和损失");
+        return new JournalEntryView(createJournalEntry(period.getAccountSetId(), "结转费用和损失"), transactions);
+    }
+
+    //结转以前年度损益调整账户
+    public JournalEntryView transferPriorYearAdjustmentAccounts(List<Account> priorYearAdjustmentAccounts, AccountingPeriod period,Account profitAccount) {
+        if(priorYearAdjustmentAccounts.isEmpty()) return null;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<Transaction> transactions = new ArrayList<>();
+        for (Account account : priorYearAdjustmentAccounts) {
+            BigDecimal balance = period.getAmountHolders().get(account.getId()).getBalance();
+            totalAmount = totalAmount.add(balance);
+            transactions.add(createTransaction(account, balance, false, "结转以前年度损益调整"));
+        }   
+        createTransaction(profitAccount, totalAmount, true, "结转以前年度损益调整");
+        return new JournalEntryView(createJournalEntry(period.getAccountSetId(), "结转以前年度损益调整"), transactions);
+    }   
+
 }

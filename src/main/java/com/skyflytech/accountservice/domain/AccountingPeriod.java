@@ -12,7 +12,6 @@ import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,15 +38,12 @@ public class AccountingPeriod {
 
     private boolean isClosed;
 
-    @NotNull(message = "期初余额不能为空")
-    private Map<String, BigDecimal> openingBalances=new HashMap<>();
-
-    @NotNull(message = "期末余额不能为空")
-    private Map<String, BigDecimal> closingBalances=new HashMap<>();
+    @NotNull(message = "期末数据不能为空")
+    private Map<String, AccountAmountHolder> amountHolders = new HashMap<>();
 
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
 
-    // ... 其他字段和方法 ...
+
 }

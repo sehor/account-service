@@ -1,17 +1,21 @@
 package com.skyflytech.accountservice.controller;
 
 import com.skyflytech.accountservice.domain.AccountingPeriod;
+import com.skyflytech.accountservice.domain.account.Account;
 import com.skyflytech.accountservice.service.AccountingPeriodService;
 import com.skyflytech.accountservice.service.CloseAccountingPeriodService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -35,5 +39,11 @@ public class AccountingPeriodController {
             errorResponse.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         }
+    }
+
+    @GetMapping("/leaf-accounts")
+    public ResponseEntity<List<Account>> findAllLeafAccountsForClosingPeriod(@RequestParam String accountSetId) {
+        List<Account> leafAccounts = closeAccountingPeriodService.findAllLeafAccountsForClosingPeriod(accountSetId);
+        return ResponseEntity.ok(leafAccounts);
     }
 }

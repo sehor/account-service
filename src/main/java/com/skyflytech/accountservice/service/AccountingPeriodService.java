@@ -1,5 +1,6 @@
 package com.skyflytech.accountservice.service;
 
+import com.skyflytech.accountservice.domain.AccountAmountHolder;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
@@ -20,6 +21,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,16 +45,13 @@ public class AccountingPeriodService {
         initialPeriod.setAccountSetId(accountSetId);
         initialPeriod.setName(generatePeriodName(startMonth));
         initialPeriod.setStartDate(startMonth.atDay(1));
-        initialPeriod.setEndDate(startMonth.atEndOfMonth());
-        initialPeriod.setOpeningBalances(Map.of()); // 初始余额为空
-        initialPeriod.setClosingBalances(Map.of()); // 初始余额为空
+        initialPeriod.setEndDate(startMonth.atEndOfMonth());// 初始余额为空
         initialPeriod.setClosed(false);
 
         return accountingPeriodRepository.save(initialPeriod);
     }
 
     @Transactional
-
     public void updateAccountingPeriodsWhenTransactionAmountChange(Transaction transaction, BigDecimal debitChange,
             BigDecimal creditChange) {
         Account account = mongoTemplate.findById(transaction.getAccountId(), Account.class);
@@ -65,22 +64,9 @@ public class AccountingPeriodService {
         List<String> relatedAccountIds = getRelatedAccountIds(account.getId());
 
         for (AccountingPeriod period : accountingPeriods) {
-
-            // 如果transaction的modifiedDate在accountingPeriod的startDate之后，则不update
-            // openingBalances
-            if (transaction.getModifiedDate().isAfter(period.getStartDate())) {
-                updateAccountingPeriodBalances(period.getOpeningBalances(), relatedAccountIds,
-                        account.getBalanceDirection(), debitChange, creditChange);
-            }
-
-            // update accountingPeriod's closingBalances
-            updateAccountingPeriodBalances(period.getClosingBalances(), relatedAccountIds,
-                    account.getBalanceDirection(), debitChange, creditChange);
-
-            // save accountingperiods' openingBalances and closingBalances
-            mongoTemplate.save(period);
+               updatePeriodAmountHolders(period,relatedAccountIds,account.getBalanceDirection(),debitChange,creditChange);
         }
-
+        accountingPeriodRepository.saveAll(accountingPeriods);
     }
 
     private List<AccountingPeriod> findRelevantAccountingPeriods(String accountSetId, LocalDate modifiedDate) {
@@ -96,14 +82,21 @@ public class AccountingPeriodService {
     }
 
     // update balances of related accounts in accountingPeriod
-    private void updateAccountingPeriodBalances(Map<String, BigDecimal> balances, List<String> relatedAccountIds,
-            AccountingDirection direction, BigDecimal debitChange, BigDecimal creditChange) {
+    public void updatePeriodAmountHolders(AccountingPeriod period, List<String> relatedAccountIds,
+                                           AccountingDirection direction, BigDecimal debitChange, BigDecimal creditChange) {
+        Map<String,AccountAmountHolder> amountHolders=period.getAmountHolders();
         for (String accountId : relatedAccountIds) {
-            BigDecimal currentBalance = balances.getOrDefault(accountId, BigDecimal.ZERO);
-            BigDecimal newBalance = (direction == AccountingDirection.DEBIT)
-                    ? currentBalance.add(debitChange).subtract(creditChange)
-                    : currentBalance.add(creditChange).subtract(debitChange);
-            balances.put(accountId, newBalance);
+            AccountAmountHolder accountAmountHolder = amountHolders.get(accountId);
+            if(accountAmountHolder==null){
+                throw new NoSuchElementException("can find account id:"+accountId+" when update period amount holder");
+            }
+            accountAmountHolder.setTotalCredit(accountAmountHolder.getTotalCredit().add(creditChange));
+            accountAmountHolder.setTotalDebit(accountAmountHolder.getTotalDebit().add(debitChange));
+            if(direction==AccountingDirection.DEBIT){
+                accountAmountHolder.setBalance(accountAmountHolder.getBalance().add(debitChange).subtract(creditChange));
+            }else{
+                accountAmountHolder.setBalance(accountAmountHolder.getBalance().add(creditChange).subtract(debitChange));
+            }
         }
     }
 

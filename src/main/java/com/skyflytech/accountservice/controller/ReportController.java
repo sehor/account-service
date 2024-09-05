@@ -3,6 +3,9 @@ package com.skyflytech.accountservice.controller;
 import com.skyflytech.accountservice.report.IncomeStatement;
 import com.skyflytech.accountservice.service.ReportService;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
+
+import java.time.LocalDate;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,12 +20,14 @@ public class ReportController {
     @GetMapping("/income-statement")
     public ResponseEntity<IncomeStatement> getIncomeStatement(
             @RequestParam String accountSetId,
-            @RequestParam String beginPeriod,
-            @RequestParam String endPeriod) {
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
         
         // 创建 AccountingPeriod 对象
-        AccountingPeriod begin = new AccountingPeriod(beginPeriod);
-        AccountingPeriod end = new AccountingPeriod(endPeriod);
+        AccountingPeriod begin = new AccountingPeriod();
+        begin.setStartDate(startDate);
+        AccountingPeriod end = new AccountingPeriod();
+        end.setEndDate(endDate);
 
         // 创建 IncomeStatement 实例
         IncomeStatement incomeStatement = new IncomeStatement(accountSetId, begin, end);

@@ -28,17 +28,11 @@ public final class GlobalConst {
     public static final String UNDISTRIBUTED_PROFIT_CODE = "31040015";
 
     // 存储需要在期末自动结转的账户类型
-    public static final Map<TransferAccountType, List<AccountType>> AUTO_TRANSFER_ACCOUNTS;
+    public static final Map<TransferAccountType, List<AccountType>> AUTO_TRANSFER_ACCOUNTS=Map.of(
+        TransferAccountType.INCOME,List.of(AccountType.OPERATING_REVENUE,AccountType.OTHER_INCOME),
+        TransferAccountType.ALL_EXPENSE_TYPES,List.of(AccountType.OPERATING_COST_TAX,AccountType.PERIOD_EXPENSE,AccountType.OTHER_EXPENSE,AccountType.INCOME_TAX),
+        TransferAccountType.PRIOR_YEAR_ADJUSTMENT,List.of(AccountType.PRIOR_YEAR_ADJUSTMENT)
+    );
 
     public static final String Current_AccountSet_Id_Test = "accountSetId_for_test";
-
-    static {
-        Map<TransferAccountType, List<AccountType>> tempMap = new EnumMap<>(TransferAccountType.class);
-        tempMap.put(TransferAccountType.INCOME, Arrays.asList(AccountType.OPERATING_REVENUE, AccountType.OTHER_INCOME));
-        tempMap.put(TransferAccountType.COST_AND_EXPENSE, Arrays.asList(AccountType.COST, AccountType.OPERATING_COST_TAX, AccountType.PERIOD_EXPENSE));
-        tempMap.put(TransferAccountType.NON_OPERATING_EXPENSE, List.of(AccountType.OTHER_EXPENSE));
-        tempMap.put(TransferAccountType.PRIOR_YEAR_ADJUSTMENT, List.of(AccountType.PRIOR_YEAR_ADJUSTMENT));
-
-        AUTO_TRANSFER_ACCOUNTS = Collections.unmodifiableMap(tempMap);
-    }
 }
