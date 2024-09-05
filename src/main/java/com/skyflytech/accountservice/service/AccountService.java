@@ -11,6 +11,7 @@ import com.skyflytech.accountservice.domain.account.AccountingDirection;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.repository.AccountMongoRepository;
 import com.skyflytech.accountservice.repository.AccountingPeriodRepository;
+import com.skyflytech.accountservice.repository.TransactionMongoRepository;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
 import org.apache.poi.ss.usermodel.*;
@@ -44,17 +45,20 @@ public class AccountService {
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final MongoTemplate mongoTemplate;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
+    private final TransactionMongoRepository transactionMongoRepository;
 
     @Autowired
     public AccountService(AccountMongoRepository accountMongoRepository,
             AccountingPeriodRepository accountingPeriodRepository,
             MongoTemplate mongoTemplate,
-            CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+            CurrentAccountSetIdHolder currentAccountSetIdHolder,
+            TransactionMongoRepository transactionMongoRepository) {
 
         this.accountMongoRepository = accountMongoRepository;
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
+        this.transactionMongoRepository = null;
     }
 
     @Transactional
@@ -88,7 +92,7 @@ public class AccountService {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "导入失败，请检查文件格式是否正确。");
         }
 
-        //set id to account
+        // set id,initialBalance to account
         for (Account account : accounts) {
             // check if already exists
             Account existingAccount = mongoTemplate.findOne(Query.query(
@@ -96,6 +100,7 @@ public class AccountService {
                     Account.class);
             if (existingAccount != null) {
                 account.setId(existingAccount.getId());
+                account.setInitialBalance(existingAccount.getInitialBalance());
             } else {
                 account = accountMongoRepository.save(account);
             }
@@ -111,9 +116,13 @@ public class AccountService {
         for (Account account : accounts) {
             int parentLevel = account.getLevel() - 1;
             if (parentLevel > 0) {
-                String parentCode = account.getCode().substring(0, GlobalConst.ACCOUNT_Code_LENGTH[parentLevel-1]);
+                String parentCode = account.getCode().substring(0, GlobalConst.ACCOUNT_Code_LENGTH[parentLevel - 1]);
                 account.setParentId(accountMap.get(parentCode).getId());
             }
+        }
+        // set isLeaf
+        for (Account account : accounts) {
+            account.setLeaf(true);
         }
         accountMongoRepository.saveAll(accounts);
     }
@@ -136,6 +145,7 @@ public class AccountService {
                 .orElseThrow(() -> new NoSuchElementException("no such account: " + id));
     }
 
+    @Transactional
     public Account createAccount(Account account) {
         // check accountSetId
         checkAccountSetId(account);
@@ -143,9 +153,29 @@ public class AccountService {
         // 检查名称、类型和代码是否重复
         checkDuplicateAccount(account);
         validateAndSetAccountLevel(account);
+        // 检查父账户
+        if (account.getLevel() <= 1) {
+            return accountMongoRepository.save(account);
+        }
+        Account parentAccount = getParentAndCheckParentId(account);
+        checkParentCode(account, parentAccount);
+        account.setParentId(parentAccount.getId());
+        if (parentAccount.isLeaf()) {
+            // transfer transactions belong to parentAccount to it's child account
+            List<Transaction> transactions = mongoTemplate
+                    .find(Query.query(Criteria.where("accountId").is(parentAccount.getId())), Transaction.class);
+            for (Transaction transaction : transactions) {
+                transaction.setAccountId(account.getId());
+            }
+            transactionMongoRepository.saveAll(transactions);
+            parentAccount.setLeaf(false);
+            account.setLeaf(true);
+        }
+        mongoTemplate.save(parentAccount);
         return accountMongoRepository.save(account);
     }
 
+    @Transactional
     public Account updateAccount(Account updatedAccount) {
         validateAndSetAccountLevel(updatedAccount);
         // 检查 accountSetId
@@ -170,10 +200,16 @@ public class AccountService {
             }
         }
 
-        // 更新账户
+        // 检查父账户
+        if (updatedAccount.getLevel() <= 1) {
+            return accountMongoRepository.save(updatedAccount);
+        }
+        Account parentAccount = getParentAndCheckParentId(updatedAccount);
+        checkParentCode(updatedAccount, parentAccount);
         return accountMongoRepository.save(updatedAccount);
     }
 
+    @Transactional
     public void deleteAccount(String id) {
         Account account = accountMongoRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Account not found with id: " + id));
@@ -189,6 +225,14 @@ public class AccountService {
                     "The account has transactions, not allowed to delete.");
         }
         accountMongoRepository.delete(account);
+        // if it's parentAccount has no other children,set it's parentAccount to leaf
+        if (account.getParentId() != null) {
+            Account parentAccount = mongoTemplate.findById(account.getParentId(), Account.class);
+            if (parentAccount != null && isLeaf(parentAccount)) {
+                parentAccount.setLeaf(true);
+                mongoTemplate.save(parentAccount);
+            }
+        }
     }
 
     /* fuzzy search by name or code */
@@ -224,8 +268,6 @@ public class AccountService {
         return leafSubAccounts;
     }
 
- 
-
     public BigDecimal calculateAccountBalanceAtDate(String accountId, LocalDate date) {
         Account account = accountMongoRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Account not found"));
@@ -246,7 +288,7 @@ public class AccountService {
         BigDecimal totalDebit = BigDecimal.ZERO;
         BigDecimal totalCredit = BigDecimal.ZERO;
         AccountAmountHolder accountAmountHolder = currentPeriod.getAmountHolders().get(accountId);
-        if (accountAmountHolder == null) {  
+        if (accountAmountHolder == null) {
             accountAmountHolder = new AccountAmountHolder();
         }
         for (Transaction transaction : transactions) {
@@ -257,9 +299,11 @@ public class AccountService {
         accountAmountHolder.setTotalCredit(totalCredit);
 
         if (account.getBalanceDirection() == AccountingDirection.DEBIT) {
-            accountAmountHolder.setBalance(accountAmountHolder.getTotalDebit().subtract(accountAmountHolder.getTotalCredit()));
+            accountAmountHolder
+                    .setBalance(accountAmountHolder.getTotalDebit().subtract(accountAmountHolder.getTotalCredit()));
         } else {
-            accountAmountHolder.setBalance(accountAmountHolder.getTotalCredit().subtract(accountAmountHolder.getTotalDebit()));
+            accountAmountHolder
+                    .setBalance(accountAmountHolder.getTotalCredit().subtract(accountAmountHolder.getTotalDebit()));
         }
         return accountAmountHolder.getBalance();
     }
@@ -307,7 +351,6 @@ public class AccountService {
         return leafAccounts;
     }
 
-
     public Map<String, BigDecimal> calculateAllAccountBalancesForMonth(String accountSetId, YearMonth month) {
         // 获取该账套下的所有账户
         List<Account> allAccounts = accountMongoRepository.findByAccountSetId(accountSetId);
@@ -340,43 +383,43 @@ public class AccountService {
         if (accountSetId == null || !accountSetId.equals(currentAccountSetIdHolder.getCurrentAccountSetId())) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match.");
         }
-        //find accountSet
-        AccountSet accountSet=mongoTemplate.findById(accountSetId, AccountSet.class);
-        if(accountSet==null){
+        // find accountSet
+        AccountSet accountSet = mongoTemplate.findById(accountSetId, AccountSet.class);
+        if (accountSet == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "AccountSet not found");
         }
-        //changes of accountSet initialAccountBalance items
-        Map<String,BigDecimal> changes=new HashMap<>();
+        // changes of accountSet initialAccountBalance items
+        Map<String, BigDecimal> changes = new HashMap<>();
         for (Map.Entry<String, BigDecimal> entry : openingBalances.entrySet()) {
             String accountId = entry.getKey();
-            BigDecimal oldBalance=accountSet.getInitialAccountBalance().get(accountId);
-            if(oldBalance==null){
-                //add new item
+            BigDecimal oldBalance = accountSet.getInitialAccountBalance().get(accountId);
+            if (oldBalance == null) {
+                // add new item
                 accountSet.getInitialAccountBalance().put(accountId, entry.getValue());
                 changes.put(accountId, entry.getValue());
-            }else{
+            } else {
                 BigDecimal change = entry.getValue().subtract(oldBalance);
                 changes.put(accountId, change);
-            }   
+            }
         }
         // update all following accountingPeriods
         List<AccountingPeriod> accountingPeriods = accountingPeriodRepository.findByAccountSetId(accountSetId);
         for (AccountingPeriod accountingPeriod : accountingPeriods) {
             for (Map.Entry<String, BigDecimal> entry : changes.entrySet()) {
                 AccountAmountHolder accountAmountHolder = accountingPeriod.getAmountHolders().get(entry.getKey());
-                if(accountAmountHolder!=null){
+                if (accountAmountHolder != null) {
                     accountAmountHolder.setBalance(accountAmountHolder.getBalance().add(entry.getValue()));
-                }else{
-                    //add new item
+                } else {
+                    // add new item
                     accountAmountHolder = new AccountAmountHolder();
                     accountAmountHolder.setBalance(entry.getValue());
                     accountingPeriod.getAmountHolders().put(entry.getKey(), accountAmountHolder);
                 }
-            }   
+            }
         }
-        //保存accountingPeriods改变
+        // 保存accountingPeriods改变
         accountingPeriodRepository.saveAll(accountingPeriods);
-        //保存accountSet
+        // 保存accountSet
         for (Map.Entry<String, BigDecimal> entry : openingBalances.entrySet()) {
             accountSet.getInitialAccountBalance().put(entry.getKey(), entry.getValue());
         }
@@ -385,6 +428,7 @@ public class AccountService {
 
     /**
      * 查找一个账户的所有祖先（包括它自己）
+     * 
      * @param accountId 要查找的账户ID
      * @return 包含所有祖先账户（包括自身）的列表
      */
@@ -402,10 +446,20 @@ public class AccountService {
 
         return ancestors;
     }
-    
-    
 
-    //private methods
+    // check a acount if is a leaf
+    public boolean isLeaf(Account account) {
+        if (account.getLevel() >= GlobalConst.ACCOUNT_CODE_LEVEL_MAP.get(account.getCode().length())) {
+            return true;
+        } else {
+            List<Account> childAccounts = mongoTemplate
+                    .find(Query.query(Criteria.where("parentId").is(account.getId())), Account.class);
+            return childAccounts.isEmpty();
+        }
+
+    }
+
+    // private methods
     private void checkAccountSetId(Account account) {
         String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId();
         if (account.getAccountSetId() == null) {
@@ -503,4 +557,33 @@ public class AccountService {
                 return "";
         }
     }
+
+    // if account's level>1,get parentAccount and set
+    private Account getParentAndCheckParentId(Account account) {
+        Account parentAccount = null;
+        if (account.getParentId() != null) {
+            parentAccount = mongoTemplate.findById(account.getParentId(), Account.class);
+            if (parentAccount == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent account not found");
+            }
+        } else {
+            parentAccount = mongoTemplate.findById(account.getCode().substring(0, account.getLevel() - 1),
+                    Account.class);
+            if (parentAccount == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent account not found");
+            } else {
+                account.setParentId(parentAccount.getId());
+            }
+        }
+        return parentAccount;
+    }
+
+    // check account's parent ,if account's level>1 ,set it's parentId
+    private void checkParentCode(Account account, Account parentAccount) {
+        // check code match
+        if (!account.getCode().substring(0, account.getLevel() - 1).equals(parentAccount.getCode())) {
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "Parent account code is not match.");
+        }
+    }
+
 }

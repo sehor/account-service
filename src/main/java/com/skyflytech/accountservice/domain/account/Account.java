@@ -41,6 +41,8 @@ public class Account implements AccountSetIdAware{
 
     private Integer level;
 
+    private boolean isLeaf;
+
     public Account(String code, String name, String accountSetId, AccountType type, String parentId, AccountingDirection balanceDirection, AccountState state) {
         this.code = code;
         this.name = name;
