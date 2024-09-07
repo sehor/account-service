@@ -18,4 +18,6 @@ public interface EntryMongoRepository extends MongoRepository<JournalEntry,Strin
 
     List<JournalEntry> findAllByAccountSetId(String accountSetId);
     List<JournalEntry> findByAccountSetIdAndModifiedDateBetween(String accountSetId, LocalDate startDate, LocalDate endDate);
+    
+    void deleteByAccountSetId(String accountSetId);
 }

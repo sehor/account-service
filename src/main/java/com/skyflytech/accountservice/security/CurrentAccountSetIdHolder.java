@@ -5,10 +5,13 @@ import com.skyflytech.accountservice.global.GlobalConst;
 
 @Component
 public class CurrentAccountSetIdHolder {
+    private String currentAccountSetId = GlobalConst.Current_AccountSet_Id_Test;
+
     public String getCurrentAccountSetId() {
-        return GlobalConst.Current_AccountSet_Id_Test;
+        return currentAccountSetId;
     }
+
     public void setCurrentAccountSetId(String accountSetId) {
-        //todo
+        this.currentAccountSetId = accountSetId;
     }
 }

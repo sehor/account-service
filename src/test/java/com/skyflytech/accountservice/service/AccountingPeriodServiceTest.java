@@ -65,8 +65,6 @@ class AccountingPeriodServiceTest {
 
         // 设置 mock 行为
         when(accountingPeriodRepository.findById(accountingPeriodId)).thenReturn(Optional.of(currentPeriod));
-        when(accountService.calculateAllAccountBalancesForMonth(eq(accountSetId), any(YearMonth.class)))
-                .thenReturn(closingBalances);
         when(accountingPeriodRepository.save(any(AccountingPeriod.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // 执行测试

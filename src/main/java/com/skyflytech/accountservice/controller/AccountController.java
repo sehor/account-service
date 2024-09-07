@@ -5,6 +5,8 @@ import com.skyflytech.accountservice.domain.APIResponse;
 import com.skyflytech.accountservice.domain.account.Account;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.service.AccountService;
+import com.skyflytech.accountservice.service.ExcelImportService;
+
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,25 +33,28 @@ public class AccountController {
     private final  AccountService accountService;
     private final MongoOperations mongoOperations;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
+    private final ExcelImportService excelImportService;
+    
     @Value("${spring.profiles.active}")
     private String activeProfile;
 
-    public AccountController(MongoOperations mongoOperations, AccountService accountService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public AccountController(MongoOperations mongoOperations, AccountService accountService, CurrentAccountSetIdHolder currentAccountSetIdHolder, ExcelImportService excelImportService) {
+        this.excelImportService = excelImportService;
         this.mongoOperations = mongoOperations;
         this.accountService = accountService;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
     @ApiResponse(description = "upload a excel file")
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+    @PostMapping("/upload/{accountSetId}")
+    public ResponseEntity<String> uploadFile(@PathVariable String accountSetId, @RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             return new ResponseEntity<>("Please upload a file!", HttpStatus.BAD_REQUEST);
         }
 
         try {
             // 调用AccountService来处理上传的文件并提取Account实例
-            accountService.extractAccountsFromExcel(file.getInputStream());
+            excelImportService.extractAccountsFromExcel(file.getInputStream(), accountSetId);
 
             return new ResponseEntity<>("File uploaded and processed successfully.", HttpStatus.OK);
 

@@ -136,7 +136,10 @@ public class TransactionService {
         if(!transaction.getAccountSetId().equals(accountSetId)){
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
         }
-        }
+    }
 
-
+    @Transactional
+    public void deleteTransactionsByAccountSetId(String accountSetId) {
+        transactionRepository.deleteByAccountSetId(accountSetId);
+    }
 }

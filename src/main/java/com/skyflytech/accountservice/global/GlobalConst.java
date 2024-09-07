@@ -2,9 +2,6 @@ package com.skyflytech.accountservice.global;
 
 import com.skyflytech.accountservice.domain.account.TransferAccountType;
 import com.skyflytech.accountservice.domain.account.AccountType;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 

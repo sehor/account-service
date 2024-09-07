@@ -23,4 +23,6 @@ public interface TransactionMongoRepository extends MongoRepository<Transaction,
     List<Transaction> findDebitsAndCreditsByAccountIdAndModifiedDateLessThan(String accountId, LocalDate modifiedDate);
       @Query("{'accountSetId': ?0, 'date': {$gte: ?1, $lte: ?2}}")
     List<JournalEntry> findByAccountSetIdAndDateRange(String accountSetId, LocalDate startDate, LocalDate endDate);
+
+    void deleteByAccountSetId(String accountSetId);
 }

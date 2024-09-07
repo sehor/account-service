@@ -148,4 +148,9 @@ public class JournalEntryService {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match."); 
         }
     }
+
+    @Transactional
+    public void deleteJournalEntriesByAccountSetId(String accountSetId) {
+        journalEntryRepository.deleteByAccountSetId(accountSetId);
+    }
 }

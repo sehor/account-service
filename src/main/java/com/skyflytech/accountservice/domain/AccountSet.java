@@ -3,7 +3,6 @@ package com.skyflytech.accountservice.domain;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -13,7 +12,6 @@ import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +34,9 @@ public class AccountSet {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    //is current account set
+    private boolean isCurrent;
 
     private Map<String,BigDecimal> initialAccountBalance=new HashMap<>();
 

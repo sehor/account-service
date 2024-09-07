@@ -5,36 +5,25 @@ import com.skyflytech.accountservice.domain.AccountSet;
 import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
-import com.skyflytech.accountservice.domain.account.AccountState;
-import com.skyflytech.accountservice.domain.account.AccountType;
-import com.skyflytech.accountservice.domain.account.AccountingDirection;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.repository.AccountMongoRepository;
 import com.skyflytech.accountservice.repository.AccountingPeriodRepository;
 import com.skyflytech.accountservice.repository.TransactionMongoRepository;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.utils.Utils;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.NotAcceptableStatusException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static com.mongodb.internal.authentication.AwsCredentialHelper.LOGGER;
 
@@ -58,73 +47,7 @@ public class AccountService {
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
-        this.transactionMongoRepository = null;
-    }
-
-    @Transactional
-    public void extractAccountsFromExcel(InputStream inputStream) {
-        List<Account> accounts = new ArrayList<>();
-
-        try (Workbook workbook = new XSSFWorkbook(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0); // 假设科目表在第一个sheet中
-
-            // 假设第一行是标题，数据从第二行开始
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
-                if (row == null)
-                    continue;
-
-                String code = getCellValueAsString(row.getCell(0));
-                String name = getCellValueAsString(row.getCell(1));
-                AccountType type = AccountType.fromChineseName(getCellValueAsString(row.getCell(2)));
-                AccountingDirection balanceDirection = AccountingDirection
-                        .fromChineseName(getCellValueAsString(row.getCell(3)));
-                // AccountState state =
-                // AccountState.fromChineseName(getCellValueAsString(row.getCell(4)));
-
-                // 创建Account实例，只传入必要的参数
-                Account account = new Account(code, name, GlobalConst.Current_AccountSet_Id_Test, type,
-                        balanceDirection, AccountState.ACTIVE);
-                account.setAccountSetId(currentAccountSetIdHolder.getCurrentAccountSetId());
-                accounts.add(account);
-            }
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "导入失败，请检查文件格式是否正确。");
-        }
-
-        // set id,initialBalance to account
-        for (Account account : accounts) {
-            // check if already exists
-            Account existingAccount = mongoTemplate.findOne(Query.query(
-                    Criteria.where("code").is(account.getCode()).and("accountSetId").is(account.getAccountSetId())),
-                    Account.class);
-            if (existingAccount != null) {
-                account.setId(existingAccount.getId());
-                account.setInitialBalance(existingAccount.getInitialBalance());
-            } else {
-                account = accountMongoRepository.save(account);
-            }
-        }
-
-        // set level and set code to account map
-        Map<String, Account> accountMap = new HashMap<>();
-        for (Account account : accounts) {
-            account.setLevel(validateAndSetAccountLevel(account));
-            accountMap.put(account.getCode(), account);
-        }
-        // set parentId
-        for (Account account : accounts) {
-            int parentLevel = account.getLevel() - 1;
-            if (parentLevel > 0) {
-                String parentCode = account.getCode().substring(0, GlobalConst.ACCOUNT_Code_LENGTH[parentLevel - 1]);
-                account.setParentId(accountMap.get(parentCode).getId());
-            }
-        }
-        // set isLeaf
-        for (Account account : accounts) {
-            account.setLeaf(true);
-        }
-        accountMongoRepository.saveAll(accounts);
+        this.transactionMongoRepository = transactionMongoRepository;
     }
 
     public List<Account> getAllAccounts(String accountSetId) {
@@ -268,65 +191,6 @@ public class AccountService {
         return leafSubAccounts;
     }
 
-    public BigDecimal calculateAccountBalanceAtDate(String accountId, LocalDate date) {
-        Account account = accountMongoRepository.findById(accountId)
-                .orElseThrow(() -> new RuntimeException("Account not found"));
-
-        String accountSetId = account.getAccountSetId();
-        LocalDate periodStartDate = YearMonth.from(date).atDay(1);
-
-        AccountingPeriod currentPeriod = accountingPeriodRepository
-                .findByAccountSetIdAndStartDate(accountSetId, periodStartDate)
-                .orElseThrow(() -> new RuntimeException("No accounting period found for the given date"));
-
-        Query query = new Query();
-        query.addCriteria(Criteria.where("accountId").is(accountId)
-                .and("createdDate").gte(currentPeriod.getStartDate()).lte(date));
-
-        List<Transaction> transactions = mongoTemplate.find(query, Transaction.class);
-
-        BigDecimal totalDebit = BigDecimal.ZERO;
-        BigDecimal totalCredit = BigDecimal.ZERO;
-        AccountAmountHolder accountAmountHolder = currentPeriod.getAmountHolders().get(accountId);
-        if (accountAmountHolder == null) {
-            accountAmountHolder = new AccountAmountHolder();
-        }
-        for (Transaction transaction : transactions) {
-            totalDebit = totalDebit.add(transaction.getDebit());
-            totalCredit = totalCredit.add(transaction.getCredit());
-        }
-        accountAmountHolder.setTotalDebit(totalDebit);
-        accountAmountHolder.setTotalCredit(totalCredit);
-
-        if (account.getBalanceDirection() == AccountingDirection.DEBIT) {
-            accountAmountHolder
-                    .setBalance(accountAmountHolder.getTotalDebit().subtract(accountAmountHolder.getTotalCredit()));
-        } else {
-            accountAmountHolder
-                    .setBalance(accountAmountHolder.getTotalCredit().subtract(accountAmountHolder.getTotalDebit()));
-        }
-        return accountAmountHolder.getBalance();
-    }
-
-    public Map<String, BigDecimal> calculateAllLeafAccountBalancesForMonth(String accountSetId, YearMonth month) {
-        LocalDate endOfMonth = month.atEndOfMonth();
-
-        // 获取该账套下的所有账户
-        List<Account> allAccounts = accountMongoRepository.findByAccountSetId(accountSetId);
-
-        // 找出所有叶子账户
-        List<Account> leafAccounts = getLeafAccounts(allAccounts);
-
-        Map<String, BigDecimal> balances = new HashMap<>();
-
-        for (Account leafAccount : leafAccounts) {
-            BigDecimal balance = calculateAccountBalanceAtDate(leafAccount.getId(), endOfMonth);
-            balances.put(leafAccount.getId(), balance);
-        }
-
-        return balances;
-    }
-
     public List<Account> getLeafAccounts(List<Account> allAccounts) {
         // 创建一个Set来存储所有的父账户ID
         Set<String> parentIds = new HashSet<>();
@@ -351,32 +215,6 @@ public class AccountService {
         return leafAccounts;
     }
 
-    public Map<String, BigDecimal> calculateAllAccountBalancesForMonth(String accountSetId, YearMonth month) {
-        // 获取该账套下的所有账户
-        List<Account> allAccounts = accountMongoRepository.findByAccountSetId(accountSetId);
-
-        // 计算所有叶子账户的余额
-        Map<String, BigDecimal> leafBalances = calculateAllLeafAccountBalancesForMonth(accountSetId, month);
-
-        // 创建一个map来存储所有账户的余额
-        Map<String, BigDecimal> allBalances = new HashMap<>(leafBalances);
-
-        // 创建一个map来存储账户ID到Account对象的映射，方便快速查找
-        Map<String, Account> accountMap = allAccounts.stream()
-                .collect(Collectors.toMap(Account::getId, Function.identity()));
-
-        // 从叶子节点开始，向上计算父节点的余额
-        for (Map.Entry<String, BigDecimal> entry : leafBalances.entrySet()) {
-            Account account = accountMap.get(entry.getKey());
-            String parentId = account.getParentId();
-            while (parentId != null) {
-                allBalances.merge(parentId, entry.getValue(), BigDecimal::add);
-                parentId = accountMap.get(parentId).getParentId();
-            }
-        }
-
-        return allBalances;
-    }
 
     @Transactional
     public void initializeOpeningBalances(String accountSetId, Map<String, BigDecimal> openingBalances) {
@@ -503,7 +341,7 @@ public class AccountService {
         }
     }
 
-    private Integer validateAndSetAccountLevel(Account account) {
+    public Integer validateAndSetAccountLevel(Account account) {
         String code = account.getCode();
 
         // 检查code是否为空
@@ -535,29 +373,6 @@ public class AccountService {
         return calculatedLevel;
     }
 
-    private String getCellValueAsString(Cell cell) {
-        if (cell == null) {
-            return "";
-        }
-        switch (cell.getCellType()) {
-            case STRING:
-                return cell.getStringCellValue();
-            case NUMERIC:
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    return cell.getDateCellValue().toString();
-                } else {
-                    return String.valueOf(cell.getNumericCellValue());
-                }
-            case BOOLEAN:
-                return String.valueOf(cell.getBooleanCellValue());
-            case FORMULA:
-                return cell.getCellFormula();
-            case BLANK:
-            default:
-                return "";
-        }
-    }
-
     // if account's level>1,get parentAccount and set
     private Account getParentAndCheckParentId(Account account) {
         Account parentAccount = null;
@@ -584,6 +399,11 @@ public class AccountService {
         if (!account.getCode().substring(0, account.getLevel() - 1).equals(parentAccount.getCode())) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "Parent account code is not match.");
         }
+    }
+
+    @Transactional
+    public void deleteAccountsByAccountSetId(String accountSetId) {
+        accountMongoRepository.deleteByAccountSetId(accountSetId);
     }
 
 }

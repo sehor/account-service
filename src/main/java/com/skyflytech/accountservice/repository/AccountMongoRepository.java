@@ -13,4 +13,6 @@ public interface AccountMongoRepository extends MongoRepository<Account, String>
     List<Account> findByParentId(String parentId);
 
     List<Account> findByAccountSetId(String accountSetId);
+
+    void deleteByAccountSetId(String accountSetId);
 }

@@ -18,6 +18,5 @@ public interface AccountingPeriodRepository extends MongoRepository<AccountingPe
 
     List<AccountingPeriod> findByAccountSetId(String accountSetId);
 
-   
-
+    void deleteByAccountSetId(String accountSetId);
 }
