@@ -98,7 +98,7 @@ public class CloseAccountingPeriodService {
         if(journalEntryView!=null){
             processJournalEntryService.processJournalEntryView(journalEntryView);
         }else{
-            logger.info("凭证是空的");
+            logger.info("entry is empty");
         }
        }    
     }
@@ -107,7 +107,7 @@ public class CloseAccountingPeriodService {
         return accounts.stream()
                 .filter(account -> code.equals(account.getCode()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("未找到科目，代码: " + code));
+                .orElseThrow(() -> new RuntimeException("not found account,the code is: " + code));
     }
 
     private void checkAccountingEquation(Map<String, BigDecimal> balances) {

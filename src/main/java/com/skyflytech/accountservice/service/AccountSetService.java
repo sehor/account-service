@@ -4,6 +4,9 @@ import com.skyflytech.accountservice.domain.AccountSet;
 import com.skyflytech.accountservice.domain.account.Account;
 import com.skyflytech.accountservice.repository.AccountSetRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
@@ -20,17 +23,16 @@ public class AccountSetService  {
     private final TransactionService transactionService;
     private final JournalEntryService journalEntryService;
     private final AccountPeriodService accountPeriodService;
-    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
-
+    private final MongoTemplate mongoTemplate;
     @Autowired
-    public AccountSetService(AccountSetRepository accountSetRepository, ExcelImportService excelImportService, AccountService accountService, TransactionService transactionService, JournalEntryService journalEntryService, AccountPeriodService accountPeriodService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public AccountSetService(AccountSetRepository accountSetRepository, ExcelImportService excelImportService, AccountService accountService, TransactionService transactionService, JournalEntryService journalEntryService, AccountPeriodService accountPeriodService, CurrentAccountSetIdHolder currentAccountSetIdHolder, MongoTemplate mongoTemplate) {
         this.accountSetRepository = accountSetRepository;
         this.excelImportService = excelImportService;
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.journalEntryService = journalEntryService;
         this.accountPeriodService = accountPeriodService;
-        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Transactional
@@ -101,7 +103,11 @@ public class AccountSetService  {
         AccountSet accountSet = accountSetRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Account set not found with id: " + id));
         
-        currentAccountSetIdHolder.setCurrentAccountSetId(id);
+        
         System.out.println("Switched to account set: " + accountSet.getName() + " (ID: " + id + ")");
+    }
+
+    public List<AccountSet> getAccountSetsByIds(List<String> ids) {
+        return mongoTemplate.find(Query.query(Criteria.where("id").in(ids)), AccountSet.class);
     }
 }

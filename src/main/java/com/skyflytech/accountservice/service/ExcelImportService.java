@@ -22,7 +22,6 @@ import java.util.*;
 public class ExcelImportService {
 
     private final AccountMongoRepository accountMongoRepository;
-    private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final AccountService accountService;
 
     @Autowired
@@ -30,7 +29,6 @@ public class ExcelImportService {
             CurrentAccountSetIdHolder currentAccountSetIdHolder,
             AccountService accountService) {
         this.accountMongoRepository = accountMongoRepository;
-        this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.accountService = accountService;
     }
 
