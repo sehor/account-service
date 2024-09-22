@@ -121,8 +121,8 @@ public class AuthController {
                 String refreshToken = jwtUtil.generateToken(user);
 
                 // 设置HTTP-only cookies
-                addTokenCookie(response, "access_token", accessToken, false);
-                addTokenCookie(response, "refresh_token", refreshToken, isRememberMe);
+                jwtUtil.addTokenCookie(response, "access_token", accessToken, false);
+                jwtUtil.addTokenCookie(response, "refresh_token", refreshToken, isRememberMe);
 
                 String currentAccountSetId = user.getCurrentAccountSetId();
                 List<String> accountSetIds = user.getAccountSetIds();
@@ -175,7 +175,7 @@ public class AuthController {
             UserDetails userDetails = userService.getUserByUsername(username);
             if (jwtUtil.validateToken(refreshToken, userDetails)) {
                 String newAccessToken = jwtUtil.generateToken(userDetails);
-                addTokenCookie(response, "access_token", newAccessToken, false);
+                jwtUtil.addTokenCookie(response, "access_token", newAccessToken, false);
                 return ResponseEntity.ok().build();
             }
         }
@@ -193,10 +193,9 @@ public class AuthController {
 
 
     @GetMapping("/public/checkLoginStatus")
-    public ResponseEntity<?> checkLoginStatus() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && 
-            !(authentication instanceof AnonymousAuthenticationToken)) {
+    public ResponseEntity<?> checkLoginStatus(HttpServletRequest request) {
+        String refreshToken = getCookieValue(request, "refresh_token");
+        if (refreshToken != null && !jwtUtil.isTokenExpired(refreshToken)) {
             return ResponseEntity.ok().body(Map.of("loggedIn", true));
         } else {
             return ResponseEntity.ok().body(Map.of("loggedIn", false));
@@ -246,16 +245,7 @@ public class AuthController {
         }
     }
 
-    // 添加token到cookie
-    private void addTokenCookie(HttpServletResponse response, String name, String value, boolean isRememberMe) {
-        int maxAge = isRememberMe ? 7 * 24 * 60 * 60 : -1; // 7天或会话结束
-        Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(maxAge);
-        response.addCookie(cookie);
-    }
+
 
     private void deleteCookie(HttpServletResponse response, String name) {
         Cookie cookie = new Cookie(name, null);

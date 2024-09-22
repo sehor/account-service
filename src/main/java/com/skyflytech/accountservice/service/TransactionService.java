@@ -1,5 +1,6 @@
 package com.skyflytech.accountservice.service;
 
+import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.account.Account;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
@@ -141,5 +142,13 @@ public class TransactionService {
     @Transactional
     public void deleteTransactionsByAccountSetId(String accountSetId) {
         transactionRepository.deleteByAccountSetId(accountSetId);
+    }
+
+    //find transactions by accountingPeriod
+    public List<Transaction> findTransactionsByAccountingPeriod(AccountingPeriod accountingPeriod){
+        LocalDate startDate = accountingPeriod.getStartDate();
+        LocalDate endDate = accountingPeriod.getEndDate();
+        String accountSetId = accountingPeriod.getAccountSetId();
+        return transactionRepository.findByAccountSetIdAndModifiedDateBetween(accountSetId, startDate, endDate);
     }
 }

@@ -1,5 +1,8 @@
 package com.skyflytech.accountservice.report;
 
+import lombok.Data;
+
+@Data
 public class AccountingOperation {
     private String accountId;
     private Operator operator;
@@ -9,22 +12,5 @@ public class AccountingOperation {
         this.accountId = accountId;
         this.operator = operator;
         this.dataType = dataType;
-    }
-
-    public String getAccountId() {
-        return accountId;
-    }
-
-    public Operator getOperator() {
-        return operator;
-    }
-
-    public DataType getDataType() {
-        return dataType;
-    }
-
-    @Override
-    public String toString() {
-        return operator.getSymbol() + " " + accountId + "(" + dataType.getDescription() + ")";
     }
 }

@@ -81,8 +81,8 @@ public class AccountService {
             return accountMongoRepository.save(account);
         }
         Account parentAccount = getParentAndCheckParentId(account);
-        checkParentCode(account, parentAccount);
-        account.setParentId(parentAccount.getId());
+        //checkParentCode(account, parentAccount);
+       // account.setParentId(parentAccount.getId());
         if (parentAccount.isLeaf()) {
             // transfer transactions belong to parentAccount to it's child account
             List<Transaction> transactions = mongoTemplate
@@ -158,18 +158,28 @@ public class AccountService {
         }
     }
 
-    /* fuzzy search by name or code */
-    public List<Account> searchAccounts(String search, String accountSetId) {
-        // MongoDB 中有一个 `name`或者`code` 字段需要匹配查询条件
-        Pattern pattern = Pattern.compile(Pattern.quote(search));
-        Query query = Query.query(Criteria.where("accountSetId").is(accountSetId));
-        query.addCriteria(Criteria.where("name").regex(pattern));
-        query.addCriteria(Criteria.where("code").regex(pattern));
-        // sort by code dictionary order
-        List<Account> accounts = mongoTemplate.find(query, Account.class);
-        accounts.sort(Comparator.comparing(Account::getCode));
-        return accounts;
-    }
+/* fuzzy search by name or code */
+public List<Account> searchAccounts(String search, String accountSetId) {
+    // MongoDB fuzzy search pattern
+    Pattern pattern = Pattern.compile(Pattern.quote(search), Pattern.CASE_INSENSITIVE); // Case-insensitive match
+
+    // Create query for either `name` or `code`
+    Query query = Query.query(Criteria.where("accountSetId").is(accountSetId)
+        .orOperator(
+            Criteria.where("name").regex(pattern),
+            Criteria.where("code").regex(pattern)
+        )
+    );
+
+    // Find matching accounts
+    List<Account> accounts = mongoTemplate.find(query, Account.class);
+
+    // Sort by `code` in dictionary order
+    accounts.sort(Comparator.comparing(Account::getCode));
+
+    return accounts;
+}
+
 
     public List<Account> getLeafSubAccounts(String accountId) {
         List<Account> leafSubAccounts = new ArrayList<>();
@@ -214,7 +224,6 @@ public class AccountService {
 
         return leafAccounts;
     }
-
 
     @Transactional
     public void initializeOpeningBalances(String accountSetId, Map<String, BigDecimal> openingBalances) {
@@ -341,7 +350,7 @@ public class AccountService {
         }
     }
 
-    public Integer validateAndSetAccountLevel(Account account) {
+    public void validateAndSetAccountLevel(Account account) {
         String code = account.getCode();
 
         // 检查code是否为空
@@ -360,29 +369,29 @@ public class AccountService {
             if (code.length() != GlobalConst.ACCOUNT_Code_LENGTH[level - 1]) {
                 throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "账户编码长度与设定的级别不匹配。");
             }
+        } else {
+            // 确定编码的级别
+            int calculatedLevel = GlobalConst.ACCOUNT_CODE_LEVEL_MAP.getOrDefault(code.length(), -1);
+
+            if (calculatedLevel == -1) {
+                throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "账户编码长度不符合要求。");
+            }
+
+            account.setLevel(calculatedLevel);
         }
 
-        // 确定编码的级别
-        int calculatedLevel = GlobalConst.ACCOUNT_CODE_LEVEL_MAP.getOrDefault(code.length(), -1);
-
-        if (calculatedLevel == -1) {
-            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "账户编码长度不符合要求。");
-        }
-
-        account.setLevel(calculatedLevel);
-        return calculatedLevel;
     }
 
     // if account's level>1,get parentAccount and set
     private Account getParentAndCheckParentId(Account account) {
         Account parentAccount = null;
         if (account.getParentId() != null) {
-            parentAccount = mongoTemplate.findById(account.getParentId(), Account.class);
+            parentAccount = getAccountById(account.getParentId());
             if (parentAccount == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent account not found");
             }
         } else {
-            parentAccount = mongoTemplate.findById(account.getCode().substring(0, account.getLevel() - 1),
+            parentAccount = mongoTemplate.findOne(Query.query(Criteria.where("code").is(account.getCode().substring(0, account.getLevel() - 1))),
                     Account.class);
             if (parentAccount == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent account not found");
@@ -396,7 +405,7 @@ public class AccountService {
     // check account's parent ,if account's level>1 ,set it's parentId
     private void checkParentCode(Account account, Account parentAccount) {
         // check code match
-        if (!account.getCode().substring(0, account.getLevel() - 1).equals(parentAccount.getCode())) {
+        if (!account.getCode().substring(0, GlobalConst.ACCOUNT_Code_LENGTH[account.getLevel() - 2]).equals(parentAccount.getCode())) {
             throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "Parent account code is not match.");
         }
     }

@@ -5,34 +5,45 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import com.skyflytech.accountservice.global.GlobalConst;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 
 @Component
 public class CurrentAccountSetIdHolder {
 
+    private static final Logger logger = LoggerFactory.getLogger(CurrentAccountSetIdHolder.class);
+
     public String getCurrentAccountSetId() {
+        logger.info("Begin to get current account set ID...");
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        logger.info("The authentication: {}", authentication);
+
         if (authentication instanceof CustomAuthentication) {
             CustomAuthentication customAuth = (CustomAuthentication) authentication;
-            return customAuth.getCurrentAccountSetId();
+            String accountSetId = customAuth.getCurrentAccountSetId();
+            logger.info("Get current account set ID from CustomAuthentication: {}", accountSetId);
+            return accountSetId;
         } else if (authentication instanceof JwtAuthenticationToken) {
             JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-            return (String) jwtAuth.getToken().getClaims().get("currentAccountSetId");
+            String accountSetId = (String) jwtAuth.getToken().getClaims().get("currentAccountSetId");
+            logger.info("Get current account set ID from JwtAuthenticationToken: {}", accountSetId);
+            return accountSetId;
         }
-        return GlobalConst.Current_AccountSet_Id_Test; // 默认值
+
+        logger.warn("Cannot get current account set ID from authentication, using default value");
+        return GlobalConst.Current_AccountSet_Id_Test; // Default value
     }
 
-    @SuppressWarnings("unchecked")
+    //get accountSetIds
     public List<String> getAccountSetIds() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof CustomAuthentication) {
             CustomAuthentication customAuth = (CustomAuthentication) authentication;
             return customAuth.getAccountSetIds();
-        } else if (authentication instanceof JwtAuthenticationToken) {
-            JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-            return (List<String>) jwtAuth.getToken().getClaims().get("accountSetIds");
         }
-        return Collections.emptyList(); // 如果没有认证信息,返回空列表
+        return Collections.emptyList();
     }
+
 }

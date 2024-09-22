@@ -3,10 +3,15 @@ package com.skyflytech.accountservice.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -143,5 +148,33 @@ public class JwtUtil {
             logger.error("Error refreshing access token", e);
         }
         return null;
+    }
+
+       // 添加token到cookie
+    public void addTokenCookie(HttpServletResponse response, String name, String value, boolean isRememberMe) {
+        int maxAge = isRememberMe ? 7 * 24 * 60 * 60 : -1; // 7天或会话结束
+        Cookie cookie = new Cookie(name, value);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(maxAge);
+        response.addCookie(cookie);
+    }
+
+    //set cookies and set security context
+    public void setCookiesAndSecurityContext(HttpServletResponse response,  User user,boolean isRememberMe) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String accessToken = generateToken(user);
+        String refreshToken = generateToken(user);
+        addTokenCookie(response, "access_token", accessToken, isRememberMe);
+        addTokenCookie(response, "refresh_token", refreshToken, isRememberMe);
+        CustomAuthentication customAuth = new CustomAuthentication(
+            user, 
+            auth.getCredentials(), 
+            auth.getAuthorities(),
+            user.getCurrentAccountSetId(),
+            user.getAccountSetIds()
+            );  
+        SecurityContextHolder.getContext().setAuthentication(customAuth);
     }
 }

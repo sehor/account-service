@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Map;
 import com.skyflytech.accountservice.domain.AccountSet;
 import com.skyflytech.accountservice.service.AccountSetService;
+
+import jakarta.servlet.http.HttpServletResponse;
+
 import com.skyflytech.accountservice.security.User;
 import com.skyflytech.accountservice.security.CustomAuthentication;
 import com.skyflytech.accountservice.security.JwtUtil;
@@ -14,13 +17,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 @RestController
 @RequestMapping("/api/account-sets")
 public class AccountSetController {
-    private final Logger log = LoggerFactory.getLogger(AccountSetController.class);
     private final AccountSetService accountSetService;
     private final JwtUtil jwtUtil;
     private final UserService userService;
@@ -34,25 +34,33 @@ public class AccountSetController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<AccountSet> createAccountSet(@RequestBody AccountSet accountSet) {
-        AccountSet createdAccountSet = accountSetService.createAccountSet(accountSet);
+    public ResponseEntity<AccountSet> createAccountSet(@RequestBody AccountSet accountSet,HttpServletResponse  response) {
+        String userName = SecurityContextHolder.getContext().getAuthentication().getName();
+        AccountSet createdAccountSet = accountSetService.createAccountSet(accountSet,userName);
+        //set cookies and set security context
+        User user = userService.getUserByUsername(userName);
+        jwtUtil.setCookiesAndSecurityContext(response, user, false);
         return new ResponseEntity<>(createdAccountSet, HttpStatus.CREATED);
     }
 
     @GetMapping("/all")
     public ResponseEntity<List<AccountSet>> getAllAccountSets() {
         List<String> accountSetIds = currentAccountSetIdHolder.getAccountSetIds();
+        System.out.println("accountSetIds: " + accountSetIds);
         List<AccountSet> accountSets = accountSetService.getAccountSetsByIds(accountSetIds);
         return new ResponseEntity<>(accountSets, HttpStatus.OK);
     }
 
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> deleteAccountSet(@PathVariable String id) {
+    public ResponseEntity<Void> deleteAccountSet(@PathVariable String id, HttpServletResponse response) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof CustomAuthentication) {
             CustomAuthentication customAuth = (CustomAuthentication) auth;
+            User user = userService.getUserByUsername(customAuth.getName());
             if (customAuth.getAccountSetIds().contains(id)) {
-                accountSetService.deleteAccountSet(id);
+              User update_user  =accountSetService.deleteAccountSet(id,user);
+              //set cookies and set security context
+              jwtUtil.setCookiesAndSecurityContext(response, update_user, false);
                 return new ResponseEntity<>(HttpStatus.NO_CONTENT);
             }
         }
@@ -60,7 +68,7 @@ public class AccountSetController {
     }
 
     @PostMapping("/switch/{id}")
-    public ResponseEntity<?> switchAccountSet(@PathVariable String id) {
+    public ResponseEntity<?> switchAccountSet(@PathVariable String id, HttpServletResponse response) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof CustomAuthentication) {
             CustomAuthentication customAuth = (CustomAuthentication) auth;
@@ -72,22 +80,13 @@ public class AccountSetController {
                 if (user.getAccountSetIds().contains(id)) {
                     user = userService.updateUserCurrentAccountSetId(username, id);
                     
-                    CustomAuthentication newAuth = new CustomAuthentication(
-                        user, 
-                        auth.getCredentials(), 
-                        auth.getAuthorities(),
-                        id,
-                        user.getAccountSetIds()
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(newAuth);
-
-                    String newToken = jwtUtil.generateToken(user);
+              //set cookies and set security context
+              jwtUtil.setCookiesAndSecurityContext(response, user, false);
 
                     return ResponseEntity.ok(Map.of(
                         "message", "Account set switched successfully", 
                         "currentAccountSetId", id,
-                        "accountSetIds", user.getAccountSetIds(),
-                        "token", newToken
+                        "accountSetIds", user.getAccountSetIds()
                     ));
                 } else {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "User does not have permission for this account set:" + id));
@@ -97,5 +96,12 @@ public class AccountSetController {
             }
         }
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Unauthorized operation"));
+    }
+
+    //get account set by id
+    @GetMapping("/{id}")
+    public ResponseEntity<AccountSet> getAccountSetById(@PathVariable String id) {
+        AccountSet accountSet = accountSetService.getAccountSetById(id);
+        return new ResponseEntity<>(accountSet, HttpStatus.OK);
     }
 }

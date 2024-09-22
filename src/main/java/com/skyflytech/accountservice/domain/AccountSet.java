@@ -35,8 +35,7 @@ public class AccountSet {
 
     private LocalDateTime updatedAt;
 
-    //is current account set
-    private boolean isCurrent;
+    private String description;
 
     private Map<String,BigDecimal> initialAccountBalance=new HashMap<>();
 

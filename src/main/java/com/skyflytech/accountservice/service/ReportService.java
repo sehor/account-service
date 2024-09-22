@@ -1,11 +1,19 @@
 package com.skyflytech.accountservice.service;
 
+import com.skyflytech.accountservice.domain.AccountAmountHolder;
+import com.skyflytech.accountservice.domain.AccountingPeriod;
+import com.skyflytech.accountservice.report.AccountingFormula;
+import com.skyflytech.accountservice.report.AccountingOperation;
+import com.skyflytech.accountservice.report.DataType;
 import com.skyflytech.accountservice.report.IncomeStatement;
 import com.skyflytech.accountservice.report.ReportItem;
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
 
 @Service
 public class ReportService {
+    public ReportService() {
+    }
 
     public void initializeDefaultIncomeStatementItems(IncomeStatement incomeStatement) {
         // 主要项目 (level 1)
@@ -61,4 +69,43 @@ public class ReportService {
         incomeStatement.getNetProfit();
     }
     
+    public BigDecimal calculateFormula(AccountingFormula formula,AccountingPeriod accountingPeriod) {
+        // 计算公式
+        BigDecimal result = BigDecimal.ZERO;
+        for (AccountingOperation operation : formula.getOperations()) {
+            // 根据 operation 的类型进行计算
+            switch (operation.getOperator().getSymbol()) {
+                case "+":
+                    result.add(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    break;
+                case "-":
+                    result.subtract(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    break;
+                case "*":
+                    result.multiply(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    break;
+                case "/":
+                    result.divide(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    break;
+            }
+        }
+        return result;
+    }
+
+    private BigDecimal getAccountAmount(AccountingPeriod accountingPeriod,String accountId,DataType dataType){
+        AccountAmountHolder accountAmountHolder=accountingPeriod.getAmountHolders().get(accountId);
+        if(accountAmountHolder==null){
+            return BigDecimal.ZERO;
+        }
+        switch(dataType){
+            case DEBIT_TOTAL:
+                return accountAmountHolder.getTotalDebit();
+            case CREDIT_TOTAL:
+                return accountAmountHolder.getTotalCredit();  
+            case BALANCE:
+                return accountAmountHolder.getBalance();
+            default:
+                return BigDecimal.ZERO;
+        }
+    }
 }

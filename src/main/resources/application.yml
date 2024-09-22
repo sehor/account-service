@@ -8,6 +8,9 @@ springdoc:
     - group: 'account'
       paths-to-match: "/api/accounts/**" # Only match endpoints with /accounts/
       packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+    - group: 'accountSet'
+      paths-to-match: "/api/account-sets/**" # Only match endpoints with /account-sets/
+      packages-to-scan: com.skyflytech.accountservice.controller       
     - group: 'transaction'
       paths-to-match: "/api/transactions/**" # Only match endpoints with /transactions/
       packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
@@ -19,7 +22,10 @@ springdoc:
       packages-to-scan: com.skyflytech.accountservice.controller 
     - group: 'auth'
       paths-to-match: "/api/auth/**" # Only match endpoints with /auth/
-      packages-to-scan: com.skyflytech.accountservice.security        # Only scan this package for API endpoints
+      packages-to-scan: com.skyflytech.accountservice.security    
+    - group: 'report'
+      paths-to-match: "/api/reports/**" # Only match endpoints with /reports/
+      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
 
 # knife4j的增强配置，不需要增强可以不配
 knife4j:

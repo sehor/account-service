@@ -1,8 +1,8 @@
 package com.skyflytech.accountservice.report;
 
 public enum DataType {
-    DEBIT_AMOUNT("借方发生额"),
-    CREDIT_AMOUNT("贷方发生额"),
+    DEBIT_TOTAL("借方发生额"),
+    CREDIT_TOTAL("贷方发生额"),
     BALANCE("余额");
 
     private final String description;

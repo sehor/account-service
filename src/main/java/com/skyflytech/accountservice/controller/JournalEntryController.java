@@ -4,34 +4,16 @@ import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
 import com.skyflytech.accountservice.security.*;
 import com.skyflytech.accountservice.service.JournalEntryService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.skyflytech.accountservice.service.ProcessJournalEntry;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.time.LocalDate;
-import java.util.Map;
-
 import org.springframework.format.annotation.DateTimeFormat;
 
 /**
@@ -45,19 +27,21 @@ public class JournalEntryController {
 
     private final JournalEntryService journalEntryService;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
+    private final ProcessJournalEntry processJournalEntryView;
     @Value("${spring.profiles.active}")
     private String activeProfile;
 
     @Autowired
-    public JournalEntryController(JournalEntryService journalEntryService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public JournalEntryController(JournalEntryService journalEntryService, CurrentAccountSetIdHolder currentAccountSetIdHolder,ProcessJournalEntry processJournalEntryView) {
         this.journalEntryService = journalEntryService;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
+        this.processJournalEntryView = processJournalEntryView;
     }
 
     @PostMapping("/process")
     public ResponseEntity<?> processJournalEntryView(@RequestBody JournalEntryView journalEntryView) {
         try {
-            return ResponseEntity.ok().body(journalEntryService.processJournalEntryView(journalEntryView));
+            return ResponseEntity.ok().body(processJournalEntryView.processJournalEntryView(journalEntryView));
         }catch (Exception e){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
@@ -76,7 +60,7 @@ public class JournalEntryController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     try {
-        journalEntryService.deleteAllEntry(currentAccountSetIdHolder.getCurrentAccountSetId());
+        journalEntryService.deleteJournalEntriesByAccountSetId(currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok("deleted  records successfully!");
     }catch (Exception e){
         return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(e.getMessage());

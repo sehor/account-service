@@ -12,7 +12,7 @@ import lombok.NonNull;
 
 @Data
 @NoArgsConstructor
-@Document(collection = "accounting_formula")
+@Document(collection = "accounting_formulas")
 public class AccountingFormula {
     @Id
     private String id;
@@ -30,9 +30,4 @@ public class AccountingFormula {
         return sb.toString().trim();
     }
 
-    // 计算方法需要根据实际情况实现
-    public double calculate(/* 传入必要的参数 */) {
-        // 实现计算逻辑
-        return 0.0;
-    }
 }

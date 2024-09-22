@@ -1,10 +1,8 @@
 package com.skyflytech.accountservice.security;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.lang.NonNull;
@@ -15,6 +13,8 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +29,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     public JwtTokenFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
-        logger.info("JwtTokenFilter initialized");
     }
 
     @Override
@@ -37,50 +36,50 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response, 
                                     @NonNull FilterChain chain)
             throws ServletException, IOException {
-        logger.info("JwtTokenFilter is processing a request to: {}", request.getRequestURI());
         
         String accessToken = getTokenFromCookie(request, "access_token");
         
-        logger.info("Extracted access token from cookie: {}", accessToken);
         
         if (accessToken != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 if (jwtUtil.isTokenExpired(accessToken)) {
-                    logger.info("Access token is expired, attempting to refresh");
                     String refreshToken = getTokenFromCookie(request, "refresh_token");
                     if (refreshToken == null||jwtUtil.isTokenExpired(refreshToken)) {
-                        throw new Exception("not authenticated, please login!");
+                        throw new Exception("Not authenticated, please login!");
                     }
     
                     String newAccessToken = jwtUtil.refreshAccessToken(refreshToken);
                     if (newAccessToken != null) {
                         accessToken = newAccessToken;
                         addTokenCookie(response, "access_token", newAccessToken, false);
-                        logger.info("New access token generated and added to cookie");
+                        
+                        // 在这里设置安全上下文
+                        setSecurityContext(newAccessToken);
                     }
+                } else {
+                    setSecurityContext(accessToken);
                 }
-                
-               else{
-                    String username = jwtUtil.extractUsername(accessToken);
-                    logger.info("Extracted username: {}", username);
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                    logger.info("Loaded user details: {}", userDetails);
-                    
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    logger.info("Authentication set in SecurityContext");
-                } 
-
             } catch (Exception e) {
                 logger.error("Cannot set user authentication: {}", e);
             }
         } else {
-            logger.info("No token found in cookie or authentication already set");
         }
         
+        
         chain.doFilter(request, response);
+    }
+
+    private void setSecurityContext(String token) {
+        String username = jwtUtil.extractUsername(token);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        
+        String currentAccountSetId = jwtUtil.extractCurrentAccountSetId(token);
+        List<String> accountSetIds = jwtUtil.extractAccountSetIds(token);
+        
+        CustomAuthentication authentication = new CustomAuthentication(
+            userDetails, null, userDetails.getAuthorities(),
+            currentAccountSetId, accountSetIds);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
     private String getTokenFromCookie(HttpServletRequest request, String cookieName) {

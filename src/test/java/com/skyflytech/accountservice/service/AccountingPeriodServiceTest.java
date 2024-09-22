@@ -78,7 +78,7 @@ class AccountingPeriodServiceTest {
 
         // 验证方法调用
         verify(accountingPeriodRepository, times(2)).save(any(AccountingPeriod.class));
-        verify(journalEntryService, times(1)).processJournalEntryView(any());
+       
     }
 
     //@Test

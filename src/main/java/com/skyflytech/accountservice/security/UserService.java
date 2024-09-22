@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-
+import java.util.List;
 @Service
 public class UserService {
 
@@ -76,6 +76,17 @@ public class UserService {
         }
         return updatedUser;
     }
+
+    //update user accountSetIds
+    public User updateUserAccountSetIds(String username, List<String> accountSetIds) throws UsernameNotFoundException {
+        User user = getUserByUsername(username);
+        user.setAccountSetIds(accountSetIds);
+        User updatedUser = userRepository.save(user);
+        synchronized (userCache) {
+            userCache.put(updatedUser.getUsername(), updatedUser);
+        }
+        return updatedUser;
+    }   
 
     public User saveUser(User user) {
         User savedUser = userRepository.save(user);

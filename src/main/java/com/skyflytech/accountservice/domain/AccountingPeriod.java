@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import jakarta.validation.constraints.NotNull;
@@ -19,6 +20,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "accounting_periods")
+@CompoundIndex(name = "accountSetId_startDate", def = "{'accountSetId': 1, 'endDate': -1}")
 public class AccountingPeriod {
     @Id
     private String id;
@@ -36,6 +38,7 @@ public class AccountingPeriod {
     @Indexed
     private String accountSetId;
 
+    @Indexed
     private boolean isClosed;
 
     @NotNull(message = "期末数据不能为空")

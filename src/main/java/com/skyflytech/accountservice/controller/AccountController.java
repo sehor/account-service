@@ -21,16 +21,14 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.math.BigDecimal;
 import java.util.Map;
-
-
+import java.util.stream.Collectors;
 
 @Tag(name = "account")
 @RestController
 @RequestMapping("/api/accounts")
 public class AccountController {
 
-
-    private final  AccountService accountService;
+    private final AccountService accountService;
     private final MongoOperations mongoOperations;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final ExcelImportService excelImportService;
@@ -69,10 +67,10 @@ public class AccountController {
 
     @GetMapping("/all")
     public ResponseEntity<List<Account>> getAllAccounts() {
-
-        List<Account> accounts = accountService.getAllAccounts(getAccountSetId());
-       // int slice= Math.min(accounts.size(), 5);
-        return ResponseEntity.ok(accounts);
+        List<Account> accounts = accountService.getAllAccounts(currentAccountSetIdHolder.getCurrentAccountSetId());
+        // 限制返回的账户数量为50个
+        List<Account> limitedAccounts = accounts.stream().limit(50).collect(Collectors.toList());
+        return ResponseEntity.ok(limitedAccounts);
     }
 
     @GetMapping("/{id}")
@@ -88,7 +86,7 @@ public class AccountController {
 
     @PostMapping("/create")
     public ResponseEntity<APIResponse<Account>> createAccount(@RequestBody Account account) {
-        account.setAccountSetId(getAccountSetId());
+        account.setAccountSetId(currentAccountSetIdHolder.getCurrentAccountSetId());
         Account create = accountService.createAccount(account);
         if(create==null){
             return ResponseEntity.badRequest().body(null);
@@ -116,7 +114,7 @@ public class AccountController {
 
     @GetMapping("/search")
     public ResponseEntity<List<Account>> searchAccounts(@RequestParam("query") String query) {
-        List<Account> accounts = accountService.searchAccounts(query,getAccountSetId());
+        List<Account> accounts = accountService.searchAccounts(query,currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok(accounts);
     }
 
@@ -145,10 +143,7 @@ public class AccountController {
         long deletedCount = result.getDeletedCount();
         return ResponseEntity.ok(String.format("deleted %d records successfully!",deletedCount));
     }
-    //get accountSetId
-    private String getAccountSetId(){
-        return currentAccountSetIdHolder.getCurrentAccountSetId();
-    }
+ 
 
     @PostMapping("/initializeOpeningBalances")
     public ResponseEntity<?> initializeOpeningBalances(

@@ -110,7 +110,6 @@ public class ExcelImportService {
         // set level and set code to account map
         Map<String, Account> accountMap = new HashMap<>();
         for (Account account : accounts) {
-            account.setLevel(accountService.validateAndSetAccountLevel(account));
             accountMap.put(account.getCode(), account);
         }
         // set parentId f for accountsToBeCreated

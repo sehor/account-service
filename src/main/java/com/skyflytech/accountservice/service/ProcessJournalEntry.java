@@ -1,5 +1,6 @@
 package com.skyflytech.accountservice.service;
 
+import com.skyflytech.accountservice.domain.AccountingPeriod;
 import com.skyflytech.accountservice.domain.Transaction;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntry;
 import com.skyflytech.accountservice.domain.journalEntry.JournalEntryView;
@@ -47,14 +48,29 @@ public class ProcessJournalEntry {
         }
 
         LocalDate now = LocalDate.now();
+        //如果ModifedDate存在，检查modifiedDate是否超过当前日期
+        if (journalEntry.getModifiedDate() != null && journalEntry.getModifiedDate().isAfter(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The modifiedDate is after current date.");
+        }
+        //检查是否借贷平衡
+        validateBalancedDebitsAndCredits(journalEntryView.getTransactions());
+
         // 更新journalEntry Id
         if (!Utils.isNotEmpty(journalEntry.getId())) {
             journalEntry.setCreatedDate(now);
-            journalEntry.setModifiedDate(now);
+            if(journalEntry.getModifiedDate() == null){
+                journalEntry.setModifiedDate(now);
+            }
             // generate new id
             journalEntry.setId(UUID.randomUUID().toString());
         }
 
+        //检查最后的accountingPeriod是否在journalEntry modifiedDate 之后
+        AccountingPeriod last_accountingPeriod = accountingPeriodService.findLastAccountingPeriodByAccountSetId(journalEntry.getAccountSetId());
+        if (last_accountingPeriod.getEndDate().isBefore(journalEntry.getModifiedDate())) {
+            // 创建缺失accountingPeriods
+            accountingPeriodService.createAccountingPeriodsFromStartPeriodToEndDate(last_accountingPeriod, journalEntry.getModifiedDate());
+        }
         for (Transaction transaction : journalEntryView.getTransactions()) {
             if (!Utils.isNotEmpty(transaction.getId())) {
                 // 如果Transaction的ID为空，表示需要新建Transaction
@@ -104,6 +120,23 @@ public class ProcessJournalEntry {
         // 返回更新后的JournalEntryView
         return new JournalEntryView(journalEntry, transactions_new);
 
+    }
+
+    //
+    private void validateBalancedDebitsAndCredits(List<Transaction> transactions) {
+        BigDecimal totalDebits = BigDecimal.ZERO;
+        BigDecimal totalCredits = BigDecimal.ZERO;
+
+        for (Transaction transaction : transactions) {
+            totalDebits = totalDebits.add(transaction.getDebit());
+            totalCredits = totalCredits.add(transaction.getCredit());
+        }
+
+        if (totalDebits.compareTo(totalCredits) != 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, 
+                "Debits and credits are not balanced. Total Debits: " + totalDebits + 
+                ", Total Credits: " + totalCredits);
+        }
     }
 
 }
