@@ -1,5 +1,8 @@
 package com.skyflytech.accountservice.security;
 
+import com.skyflytech.accountservice.security.model.User;
+import com.skyflytech.accountservice.security.repository.UserRepository;
+import com.skyflytech.accountservice.security.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

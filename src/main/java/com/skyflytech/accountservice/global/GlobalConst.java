@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.global;
 
-import com.skyflytech.accountservice.domain.account.TransferAccountType;
-import com.skyflytech.accountservice.domain.account.AccountType;
+import com.skyflytech.accountservice.core.account.model.TransferAccountType;
+import com.skyflytech.accountservice.core.account.model.AccountType;
 import java.util.List;
 import java.util.Map;
 
