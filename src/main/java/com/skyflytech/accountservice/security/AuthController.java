@@ -1,5 +1,10 @@
 package com.skyflytech.accountservice.security;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,28 +13,15 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.Cookie;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -115,8 +107,7 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password));
 
-            if (authentication.getPrincipal() instanceof User) {
-                User user = (User) authentication.getPrincipal();
+            if (authentication.getPrincipal() instanceof User user) {
                 String accessToken = jwtUtil.generateToken(user);
                 String refreshToken = jwtUtil.generateToken(user);
 
@@ -201,51 +192,6 @@ public class AuthController {
             return ResponseEntity.ok().body(Map.of("loggedIn", false));
         }
     }
-
-   @PostMapping("/switchAccountSet")
-    public ResponseEntity<?> switchAccountSet(@RequestBody Map<String, String> request, @AuthenticationPrincipal UserDetails userDetails) {
-        String newAccountSetId = request.get("accountSetId");
-        String username = userDetails.getUsername();
-        
-        logger.info("try to switch account set: " + username);
-
-        try {
-            User user = userService.getUserByUsername(username);
-
-            if (!user.getAccountSetIds().contains(newAccountSetId)) {
-                logger.error("invalid account set id: " + username);
-                return ResponseEntity.badRequest().body("invalid account set id");
-            }
-
-            user = userService.updateUserCurrentAccountSetId(username, newAccountSetId);
-
-            // 更新SecurityContextHolder中的认证信息
-            CustomAuthentication newAuth = new CustomAuthentication(
-                user, 
-                userDetails.getPassword(), 
-                userDetails.getAuthorities(),
-                newAccountSetId,
-                user.getAccountSetIds()
-            );
-            SecurityContextHolder.getContext().setAuthentication(newAuth);
-
-            // 生成新的token
-            String newToken = jwtUtil.generateToken(user);
-
-            logger.info("user switch account set successfully: " + username);
-            return ResponseEntity.ok(Map.of(
-                "message", "switch account set successfully", 
-                "currentAccountSetId", newAccountSetId,
-                "accountSetIds", user.getAccountSetIds(),
-                "token", newToken
-            ));
-        } catch (UsernameNotFoundException e) {
-            logger.error("no such user found: " + username, e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("not found user");
-        }
-    }
-
-
 
     private void deleteCookie(HttpServletResponse response, String name) {
         Cookie cookie = new Cookie(name, null);

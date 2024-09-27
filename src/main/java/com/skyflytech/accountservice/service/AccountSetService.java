@@ -17,8 +17,9 @@ import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.security.User;
 import com.skyflytech.accountservice.security.UserService;
 import java.util.NoSuchElementException;
+
 @Service
-public class AccountSetService  {
+public class AccountSetService {
 
     private final AccountSetRepository accountSetRepository;
     private final ExcelImportService excelImportService;
@@ -26,10 +27,14 @@ public class AccountSetService  {
     private final TransactionService transactionService;
     private final JournalEntryService journalEntryService;
     private final AccountingPeriodService accountingPeriodService;
-    private final UserService userService;  
+    private final UserService userService;
     private final MongoTemplate mongoTemplate;
+
     @Autowired
-    public AccountSetService(AccountSetRepository accountSetRepository, ExcelImportService excelImportService, AccountService accountService, TransactionService transactionService, JournalEntryService journalEntryService, AccountingPeriodService accountingPeriodService, CurrentAccountSetIdHolder currentAccountSetIdHolder, MongoTemplate mongoTemplate, UserService userService) {
+    public AccountSetService(AccountSetRepository accountSetRepository, ExcelImportService excelImportService,
+            AccountService accountService, TransactionService transactionService,
+            JournalEntryService journalEntryService, AccountingPeriodService accountingPeriodService,
+            CurrentAccountSetIdHolder currentAccountSetIdHolder, MongoTemplate mongoTemplate, UserService userService) {
         this.accountSetRepository = accountSetRepository;
         this.excelImportService = excelImportService;
         this.accountService = accountService;
@@ -41,25 +46,34 @@ public class AccountSetService  {
     }
 
     @Transactional
-    public AccountSet createAccountSet(AccountSet accountSet,String userName) {
+    public AccountSet createAccountSet(AccountSet accountSet, String userName) {
         // 检查这里是否有权限验证逻辑
         // ...
         accountSet.setCreatedAt(LocalDateTime.now());
         accountSet.setUpdatedAt(LocalDateTime.now());
-        //check if the accountSet name is already exists
+        // check if the accountSet name is already exists
         if (accountSetRepository.findByName(accountSet.getName()).isPresent()) {
             throw new IllegalArgumentException("Account set with name " + accountSet.getName() + " already exists");
-        }   
-        // 修改资源路径
+        }
+        // 默认的会计科目资源路径
         InputStream inputStream = getClass().getClassLoader().getResourceAsStream("static/default-accounts.xlsx");
-        
+
         if (inputStream == null) {
             throw new IllegalStateException("无法找到 default_accounts.xlsx 文件");
         }
-        List<Account> accounts = accountService.getAllAccounts(accountSet.getId());
-        accountSet.setInitialAccountBalance(accounts.stream().collect(Collectors.toMap(Account::getId, Account::getInitialBalance)));
+        // 保存账套，得到账套id
         AccountSet createdAccountSet = accountSetRepository.save(accountSet);
+        // 将默认的会计科目导入到账套中
         excelImportService.extractAccountsFromExcel(inputStream, createdAccountSet.getId());
+
+        List<Account> accounts = accountService.getAllAccounts(accountSet.getId());
+        // 设置账套的初始会计科目余额
+        accountSet.setInitialAccountBalance(
+                accounts.stream().collect(Collectors.toMap(Account::getId, Account::getInitialBalance)));
+        // 为账套创建最初的会计期间
+        accountingPeriodService.createInitialAccountingPeriod(accountSet);
+
+        // 重设user context
         User user = userService.getUserByUsername(userName);
         if (user != null) {
             user.getAccountSetIds().add(createdAccountSet.getId());
@@ -67,38 +81,39 @@ public class AccountSetService  {
         }
         return createdAccountSet;
     }
-    //get all account sets
+
+    // get all account sets
     public List<AccountSet> getAllAccountSets() {
         return accountSetRepository.findAll();
     }
 
     @Transactional
-    public User deleteAccountSet(String id,User user) {
-        if(accountSetRepository.findById(id).isPresent()) {
+    public User deleteAccountSet(String id, User user) {
+        if (accountSetRepository.findById(id).isPresent()) {
             try {
                 // 1. Delete all transactions related to this account set
                 transactionService.deleteTransactionsByAccountSetId(id);
                 System.out.println("Deleted all transactions for account set " + id);
-                
+
                 // 2. Delete all journal entries related to this account set
                 journalEntryService.deleteJournalEntriesByAccountSetId(id);
                 System.out.println("Deleted all journal entries for account set " + id);
-                
+
                 // 3. Delete all accounts related to this account set
                 accountService.deleteAccountsByAccountSetId(id);
                 System.out.println("Deleted all accounts for account set " + id);
-                
+
                 // 4. Delete all accounting periods related to this account set
                 accountingPeriodService.deleteAccountPeriodsByAccountSetId(id);
                 System.out.println("Deleted all accounting periods for account set " + id);
-                
+
                 // 5. Delete the account set
                 accountSetRepository.deleteById(id);
                 System.out.println("Deleted account set " + id);
 
-                // 6. delete the account set from user's account set list  
+                // 6. delete the account set from user's account set list
                 User update_user = userService.getUserByUsername(user.getUsername());
-                
+
                 if (update_user != null) {
                     update_user.getAccountSetIds().remove(id);
                     userService.updateUserAccountSetIds(update_user.getUsername(), update_user.getAccountSetIds());
@@ -120,24 +135,24 @@ public class AccountSetService  {
     @Transactional
     public void switchAccountSet(String id) {
         AccountSet accountSet = accountSetRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Account set not found with id: " + id));
-        
-        
+                .orElseThrow(() -> new IllegalArgumentException("Account set not found with id: " + id));
+
         System.out.println("Switched to account set: " + accountSet.getName() + " (ID: " + id + ")");
     }
 
     public List<AccountSet> getAccountSetsByIds(List<String> ids) {
         Query query = new Query(Criteria.where("id").in(ids));
         query.fields()
-             .include("id")
-             .include("name")
-             .include("description");
-        
+                .include("id")
+                .include("name")
+                .include("description")
+                .include("accountingPeriodStartDate");
+
         return mongoTemplate.find(query, AccountSet.class);
     }
 
     public AccountSet getAccountSetById(String id) {
         return accountSetRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Account set not found with id: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Account set not found with id: " + id));
     }
 }

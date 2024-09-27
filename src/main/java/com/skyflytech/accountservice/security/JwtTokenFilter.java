@@ -1,22 +1,21 @@
 package com.skyflytech.accountservice.security;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.lang.NonNull;
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
 
 @Component
 public class JwtTokenFilter extends OncePerRequestFilter {
@@ -38,8 +37,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         
         String accessToken = getTokenFromCookie(request, "access_token");
-        
-        
         if (accessToken != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 if (jwtUtil.isTokenExpired(accessToken)) {
@@ -62,10 +59,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 logger.error("Cannot set user authentication: {}", e);
             }
-        } else {
         }
-        
-        
+
+
         chain.doFilter(request, response);
     }
 

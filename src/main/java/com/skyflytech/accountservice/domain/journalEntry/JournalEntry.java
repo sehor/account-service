@@ -27,7 +27,7 @@ public class JournalEntry  {
 
     private LocalDate modifiedDate;
 
-    private String voucherWord;
+    private String voucherWord="记";
 
     private int voucherNum;
     private List<String> attachmentIds;

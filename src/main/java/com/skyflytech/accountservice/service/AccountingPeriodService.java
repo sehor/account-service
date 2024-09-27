@@ -37,8 +37,7 @@ public class AccountingPeriodService {
     @Autowired
     public AccountingPeriodService(AccountingPeriodRepository accountingPeriodRepository,
             MongoTemplate mongoTemplate,
-            AccountService accountService,
-            TransactionService transactionService) {
+            AccountService accountService) {
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
         this.accountService = accountService;
@@ -149,7 +148,27 @@ public class AccountingPeriodService {
     }
 
 
+  //create an  initial accounting period
+  public AccountingPeriod createInitialAccountingPeriod(AccountSet accountSet){
+    LocalDate theFirstDayOfMonth =accountSet.getAccountingPeriodStartDate();
+    LocalDate theLastDayOfMonth = accountSet.getAccountingPeriodStartDate().plusMonths(1).minusDays(1);
+    AccountingPeriod accountingPeriod = new AccountingPeriod();
+    accountingPeriod.setAccountSetId(accountSet.getId());
+    accountingPeriod.setStartDate(theFirstDayOfMonth);
+    accountingPeriod.setEndDate(theLastDayOfMonth);
 
+    //初始化amountHolders
+    for(Entry<String,BigDecimal> entry:accountSet.getInitialAccountBalance().entrySet()){
+        AccountAmountHolder accountAmountHolder = new AccountAmountHolder();
+        accountAmountHolder.setTotalDebit(BigDecimal.ZERO);
+        accountAmountHolder.setTotalCredit(BigDecimal.ZERO);
+        accountAmountHolder.setBalance(entry.getValue());
+        accountingPeriod.getAmountHolders().put(entry.getKey(), accountAmountHolder);
+    }
+    accountingPeriod.setClosed(false);
+    //保存会计期间
+    return accountingPeriodRepository.save(accountingPeriod);
+  }
 
 
     private List<AccountingPeriod> findRelevantAccountingPeriods(String accountSetId, LocalDate modifiedDate) {

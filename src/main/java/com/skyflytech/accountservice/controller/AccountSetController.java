@@ -1,23 +1,18 @@
 package com.skyflytech.accountservice.controller;
 
-import java.util.List;
-import java.util.Map;
 import com.skyflytech.accountservice.domain.AccountSet;
+import com.skyflytech.accountservice.security.*;
 import com.skyflytech.accountservice.service.AccountSetService;
-
 import jakarta.servlet.http.HttpServletResponse;
-
-import com.skyflytech.accountservice.security.User;
-import com.skyflytech.accountservice.security.CustomAuthentication;
-import com.skyflytech.accountservice.security.JwtUtil;
-import com.skyflytech.accountservice.security.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
+
+import java.util.List;
+import java.util.Map;
 @RestController
 @RequestMapping("/api/account-sets")
 public class AccountSetController {
@@ -35,6 +30,7 @@ public class AccountSetController {
 
     @PostMapping("/create")
     public ResponseEntity<AccountSet> createAccountSet(@RequestBody AccountSet accountSet,HttpServletResponse  response) {
+        System.out.println("createAccountSet period start date: " + accountSet.getAccountingPeriodStartDate());
         String userName = SecurityContextHolder.getContext().getAuthentication().getName();
         AccountSet createdAccountSet = accountSetService.createAccountSet(accountSet,userName);
         //set cookies and set security context
@@ -70,8 +66,7 @@ public class AccountSetController {
     @PostMapping("/switch/{id}")
     public ResponseEntity<?> switchAccountSet(@PathVariable String id, HttpServletResponse response) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof CustomAuthentication) {
-            CustomAuthentication customAuth = (CustomAuthentication) auth;
+        if (auth instanceof CustomAuthentication customAuth) {
             String username = customAuth.getName();
             
             try {

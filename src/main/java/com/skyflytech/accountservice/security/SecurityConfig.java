@@ -47,43 +47,43 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(csrf -> csrf.disable()
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable
 /*                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())  // 这里修改为 withHttpOnlyFalse()
                 .ignoringRequestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout") */
-            )
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/", 
-                    "/api/auth/login", 
-                    "/api/auth/register", 
-                    "/api/auth/refresh", 
-                    "/api/auth/logout",
-                    "/api/auth/user",
-                    "/error", 
-                    "/api/auth/public/**",
-                    "/v3/api-docs/**", // 开放 Swagger API 文档路径
-                    "/swagger-ui/**",  // 开放 Swagger UI 路径
-                    "/swagger-ui.html",//开放swagger-ui.html
-                    "/doc.html"//开放knife4j文档
                 )
-                .permitAll()
-                .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthenticationConverter())))
-            .exceptionHandling(exceptions -> exceptions
-                .authenticationEntryPoint((request, response, authException) -> {
-                    response.setContentType("application/json;charset=UTF-8");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    String message = "Authentication failed: " + authException.getMessage();
-                    response.getWriter().write(
-                            new ObjectMapper().writeValueAsString(Map.of("message", message, "status", 401)));
-                }))
-            .formLogin(AbstractHttpConfigurer::disable)
-            .logout(AbstractHttpConfigurer::disable)
-            .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class); // 添加 JwtTokenFilter
-            
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/",
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/refresh",
+                                "/api/auth/logout",
+                                "/api/auth/user",
+                                "/error",
+                                "/api/auth/public/**",
+                                "/v3/api-docs/**", // 开放 Swagger API 文档路径
+                                "/swagger-ui/**",  // 开放 Swagger UI 路径
+                                "/swagger-ui.html",//开放swagger-ui.html
+                                "/doc.html"//开放knife4j文档
+                        )
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            String message = "Authentication failed: " + authException.getMessage();
+                            response.getWriter().write(
+                                    new ObjectMapper().writeValueAsString(Map.of("message", message, "status", 401)));
+                        }))
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class); // 添加 JwtTokenFilter
+
         return http.build();
     }
 

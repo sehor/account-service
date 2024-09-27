@@ -11,6 +11,7 @@ import com.skyflytech.accountservice.report.AccountingOperation;
 import com.skyflytech.accountservice.repository.EntryMongoRepository;
 import com.skyflytech.accountservice.security.CurrentAccountSetIdHolder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -93,7 +94,10 @@ public class JournalEntryService {
                 .collect(Collectors.toList());
     }
 
-
+    //获取某个会计期间的所有凭证
+    public List<JournalEntry> getJournalEntriesByPeriod(String accountSetId, AccountingPeriod accountingPeriod) {
+        return journalEntryRepository.findByAccountSetIdAndModifiedDateBetween(accountSetId, accountingPeriod.getStartDate(), accountingPeriod.getEndDate());
+    }
 
     @Transactional
     public void deleteJournalEntriesByAccountSetId(String accountSetId) {
@@ -118,6 +122,46 @@ public void autoGenerateJournalEntry(AutoEntryTemplate template,LocalDate create
     JournalEntryView journalEntryView = new JournalEntryView(journalEntry, transactions);
     processJournalEntry.processJournalEntryView(journalEntryView);
 }
+
+ //找到某个会计期间的最大凭证号
+ public int findMaxVoucherNum(String accountSetId, LocalDate date) {
+    Query query = new Query(Criteria.where("accountSetId").is(accountSetId).and("modifiedDate").lte(date));
+    query.with(Sort.by(Sort.Direction.ASC, "voucherNum"));
+    query.limit(1);
+    JournalEntry journalEntry = mongoTemplate.findOne(query, JournalEntry.class);
+    if(journalEntry==null){
+        return 0;
+    }
+    return journalEntry.getVoucherNum();
+}
+
+//按时间顺序重新排序并重设凭证号
+public void reorderVoucherNum(String accountSetId, LocalDate startDate,LocalDate endDate) {
+    Query query = new Query(Criteria.where("accountSetId").is(accountSetId).and("modifiedDate").lte(endDate).gte(startDate));
+    query.with(Sort.by(Sort.Direction.ASC, "modifiedDate"));
+    List<JournalEntry> journalEntries = mongoTemplate.find(query, JournalEntry.class);
+    for (int i = 0; i < journalEntries.size(); i++) {
+        journalEntries.get(i).setVoucherNum(i + 1);
+    }
+    journalEntryRepository.saveAll(journalEntries);
+} 
+
+//某个会计期间凭证号是否连续
+public boolean isVoucherNumContinuous(AccountingPeriod accountingPeriod) {
+    String accountSetId=accountingPeriod.getAccountSetId();
+    LocalDate startDate=accountingPeriod.getStartDate();
+    LocalDate endDate=accountingPeriod.getEndDate();
+    Query query = new Query(Criteria.where("accountSetId").is(accountSetId).and("modifiedDate").lte(endDate).gte(startDate));
+    query.with(Sort.by(Sort.Direction.ASC, "voucherNum"));
+    List<JournalEntry> journalEntries = mongoTemplate.find(query, JournalEntry.class);
+    for (int i = 0; i < journalEntries.size() - 1; i++) {
+        if (journalEntries.get(i).getVoucherNum() + 1 != journalEntries.get(i + 1).getVoucherNum()) {
+            return false;
+        }
+    }
+    return true;
+}   
+
 
 
 

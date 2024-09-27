@@ -1,5 +1,8 @@
 package com.skyflytech.accountservice.security;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -7,8 +10,6 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.List;
 @Service
 public class UserService {
@@ -17,14 +18,6 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final int CACHE_SIZE = 500; // 设置缓存大小
-    private final Map<String, User> userCache = new LinkedHashMap<String, User>(CACHE_SIZE, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, User> eldest) {
-            return size() > CACHE_SIZE;
-        }
-    };
-
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = new BCryptPasswordEncoder(); // 在这里创建新的 PasswordEncoder
@@ -44,16 +37,12 @@ public class UserService {
 
         // 保存用户
         User savedUser = userRepository.save(user);
-        synchronized (userCache) {
-            userCache.put(savedUser.getUsername(), savedUser);
-        }
         return savedUser;
     }
 
+    @Cacheable(value = "users", key = "#username")
     public User getUserByUsername(String username) throws UsernameNotFoundException {
-        synchronized (userCache) {
-            return userCache.computeIfAbsent(username, this::loadUserFromDatabase);
-        }
+        return loadUserFromDatabase(username);
     }
 
     private User loadUserFromDatabase(String username) {
@@ -67,42 +56,32 @@ public class UserService {
         return user;
     }
 
+    @CachePut(value = "users", key = "#username")
     public User updateUserCurrentAccountSetId(String username, String newAccountSetId) throws UsernameNotFoundException {
         User user = getUserByUsername(username);
         user.setCurrentAccountSetId(newAccountSetId);
-        User updatedUser = userRepository.save(user);
-        synchronized (userCache) {
-            userCache.put(updatedUser.getUsername(), updatedUser);
-        }
-        return updatedUser;
+        return userRepository.save(user);
     }
 
     //update user accountSetIds
+    @CachePut(value = "users", key = "#username")
     public User updateUserAccountSetIds(String username, List<String> accountSetIds) throws UsernameNotFoundException {
         User user = getUserByUsername(username);
         user.setAccountSetIds(accountSetIds);
-        User updatedUser = userRepository.save(user);
-        synchronized (userCache) {
-            userCache.put(updatedUser.getUsername(), updatedUser);
-        }
-        return updatedUser;
+        return userRepository.save(user);
     }   
 
+    @CachePut(value = "users", key = "#user.username")
     public User saveUser(User user) {
-        User savedUser = userRepository.save(user);
-        synchronized (userCache) {
-            userCache.put(savedUser.getUsername(), savedUser);
-        }
-        return savedUser;
+        return userRepository.save(user);
     }
 
+    @CacheEvict(value = "users", key = "#user.username")
     public void deleteUser(User user) {
         userRepository.delete(user);
-        synchronized (userCache) {
-            userCache.remove(user.getUsername());
-        }
     }
 
+    @CacheEvict(value = "users", key = "#id")
     public void deleteUser(String id) {
         User user = userRepository.findById(id).orElseThrow(() -> new UsernameNotFoundException("User not found: " + id));
         deleteUser(user);
