@@ -1,7 +1,8 @@
-package com.skyflytech.accountservice.core.journalEntry.service;
+package com.skyflytech.accountservice.core.journalEntry.service.imp;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
+import com.skyflytech.accountservice.core.journalEntry.service.ProcessJournalEntry;
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.account.model.AccountingDirection;
 import com.skyflytech.accountservice.core.journalEntry.model.AutoEntryTemplate;
@@ -10,7 +11,7 @@ import com.skyflytech.accountservice.core.journalEntry.model.JournalEntryView;
 import com.skyflytech.accountservice.core.report.model.AccountingOperation;
 import com.skyflytech.accountservice.core.journalEntry.repository.EntryMongoRepository;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
-import com.skyflytech.accountservice.core.transaction.service.TransactionService;
+import com.skyflytech.accountservice.core.transaction.service.imp.TransactionServiceImp;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -33,21 +34,21 @@ import java.util.stream.Collectors;
  **/
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class JournalEntryService {
+public class JournalEntryServiceImp {
 
     private final EntryMongoRepository journalEntryRepository;
-    private final TransactionService transactionService;
+    private final TransactionServiceImp transactionServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final MongoTemplate mongoTemplate;
     private final ProcessJournalEntry processJournalEntry;
     @Autowired
-    public JournalEntryService(EntryMongoRepository journalEntryRepository, 
-                               TransactionService transactionService,
-                               CurrentAccountSetIdHolder currentAccountSetIdHolder,
-                               MongoTemplate mongoTemplate,
-                               ProcessJournalEntry processJournalEntry) {
+    public JournalEntryServiceImp(EntryMongoRepository journalEntryRepository,
+                                  TransactionServiceImp transactionServiceImp,
+                                  CurrentAccountSetIdHolder currentAccountSetIdHolder,
+                                  MongoTemplate mongoTemplate,
+                                  ProcessJournalEntry processJournalEntry) {
         this.journalEntryRepository = journalEntryRepository;
-        this.transactionService = transactionService;
+        this.transactionServiceImp = transactionServiceImp;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.mongoTemplate = mongoTemplate;
         this.processJournalEntry = processJournalEntry;
@@ -57,7 +58,7 @@ public class JournalEntryService {
     @Transactional
     public void deleteEntry(JournalEntry journalEntry) {
         checkAccountSetId(journalEntry);
-        transactionService.deleteByJourneyEntry(journalEntry);
+        transactionServiceImp.deleteByJourneyEntry(journalEntry);
         journalEntryRepository.delete(journalEntry);
     }
 

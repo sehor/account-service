@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.core.journalEntry.service;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-import com.skyflytech.accountservice.core.accountingPeriod.service.AccountingPeriodService;
+import com.skyflytech.accountservice.core.accountingPeriod.service.imp.AccountingPeriodServiceImp;
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.journalEntry.model.JournalEntry;
 import com.skyflytech.accountservice.core.journalEntry.model.JournalEntryView;
@@ -25,15 +25,15 @@ import java.util.stream.Collectors;
 public class ProcessJournalEntry {
     private final MongoTemplate mongoTemplate;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
-    private final AccountingPeriodService accountingPeriodService;
+    private final AccountingPeriodServiceImp accountingPeriodServiceImp;
     private final TransactionMongoRepository transactionRepository;
 
     public ProcessJournalEntry(MongoTemplate mongoTemplate,
                                CurrentAccountSetIdHolder currentAccountSetIdHolder,
-                               AccountingPeriodService accountingPeriodService, TransactionMongoRepository transactionRepository) {
+                               AccountingPeriodServiceImp accountingPeriodServiceImp, TransactionMongoRepository transactionRepository) {
         this.mongoTemplate = mongoTemplate;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
-        this.accountingPeriodService = accountingPeriodService;
+        this.accountingPeriodServiceImp = accountingPeriodServiceImp;
         this.transactionRepository = transactionRepository;
     }
 
@@ -67,10 +67,10 @@ public class ProcessJournalEntry {
         }
 
         //检查最后的accountingPeriod是否在journalEntry modifiedDate 之后
-        AccountingPeriod last_accountingPeriod = accountingPeriodService.findLastAccountingPeriodByAccountSetId(journalEntry.getAccountSetId());
+        AccountingPeriod last_accountingPeriod = accountingPeriodServiceImp.findLastAccountingPeriodByAccountSetId(journalEntry.getAccountSetId());
         if (last_accountingPeriod.getEndDate().isBefore(journalEntry.getModifiedDate())) {
             // 创建缺失accountingPeriods
-            accountingPeriodService.createAccountingPeriodsFromStartPeriodToEndDate(last_accountingPeriod, journalEntry.getModifiedDate());
+            accountingPeriodServiceImp.createAccountingPeriodsFromStartPeriodToEndDate(last_accountingPeriod, journalEntry.getModifiedDate());
         }
         for (Transaction transaction : journalEntryView.getTransactions()) {
             if (!Utils.isNotEmpty(transaction.getId())) {
@@ -78,7 +78,7 @@ public class ProcessJournalEntry {
                 transaction.setCreatedDate(journalEntry.getCreatedDate());
                 transaction.setModifiedDate(journalEntry.getModifiedDate());
                 transaction.setAccountSetId(journalEntry.getAccountSetId());
-                accountingPeriodService.updateAccountingPeriodsWhenTransactionAmountChange(transaction, transaction.getDebit(), transaction.getCredit());
+                accountingPeriodServiceImp.updateAccountingPeriodsWhenTransactionAmountChange(transaction, transaction.getDebit(), transaction.getCredit());
             } else {
                 // 如果Transaction的ID不为空，表示需要更新Transaction
                 transaction.setModifiedDate(journalEntry.getModifiedDate());
@@ -89,7 +89,7 @@ public class ProcessJournalEntry {
                 BigDecimal debitChange = transaction.getDebit().subtract(oldTransaction.getDebit());
                 BigDecimal creditChange = transaction.getCredit().subtract(oldTransaction.getCredit());
                 if (debitChange.compareTo(BigDecimal.ZERO) != 0 || creditChange.compareTo(BigDecimal.ZERO) != 0) {
-                    accountingPeriodService.updateAccountingPeriodsWhenTransactionAmountChange(transaction, debitChange, creditChange);
+                    accountingPeriodServiceImp.updateAccountingPeriodsWhenTransactionAmountChange(transaction, debitChange, creditChange);
                 }
             }
             transactions_new.add(transaction);
@@ -109,7 +109,7 @@ public class ProcessJournalEntry {
                 if (transaction == null) {
                     throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found");
                 }
-               accountingPeriodService.updateAccountingPeriodsWhenTransactionAmountChange(transaction, transaction.getDebit().negate(),
+               accountingPeriodServiceImp.updateAccountingPeriodsWhenTransactionAmountChange(transaction, transaction.getDebit().negate(),
                         transaction.getCredit().negate());
                 mongoTemplate.remove(transaction);
             }

@@ -1,5 +1,6 @@
 package com.skyflytech.accountservice.security.service;
 
+import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -8,14 +9,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserService userService;
+    private final UserServiceImp userServiceImp;
 
-    public CustomUserDetailsService(UserService userService) {
-        this.userService = userService;
+    public CustomUserDetailsService(UserServiceImp userServiceImp) {
+        this.userServiceImp = userServiceImp;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userService.getUserByUsername(username);
+        return userServiceImp.getUserByUsername(username);
     }
 }

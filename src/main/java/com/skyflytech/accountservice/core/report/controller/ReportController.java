@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.core.report.controller;
 
 import com.skyflytech.accountservice.core.report.model.IncomeStatement;
-import com.skyflytech.accountservice.core.report.service.ReportService;
+import com.skyflytech.accountservice.core.report.service.imp.ReportServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
 
 import java.time.LocalDate;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class ReportController {
 
     @Autowired
-    private ReportService reportService;
+    private ReportServiceImp reportServiceImp;
 
     @GetMapping("/income-statement")
     public ResponseEntity<IncomeStatement> getIncomeStatement(
@@ -33,7 +33,7 @@ public class ReportController {
         IncomeStatement incomeStatement = new IncomeStatement(accountSetId, begin, end);
 
         // 初始化默认项目
-        reportService.initializeDefaultIncomeStatementItems(incomeStatement);
+        reportServiceImp.initializeDefaultIncomeStatementItems(incomeStatement);
 
         // 这里应该添加从数据库或其他数据源获取实际数据的逻辑
         // 为了演示，我们只是设置一些示例数据
@@ -43,7 +43,7 @@ public class ReportController {
         // ... 设置其他项目的金额 ...
 
         // 计算利润表
-        reportService.calculateIncomeStatement(incomeStatement);
+        reportServiceImp.calculateIncomeStatement(incomeStatement);
 
         return ResponseEntity.ok(incomeStatement);
     }

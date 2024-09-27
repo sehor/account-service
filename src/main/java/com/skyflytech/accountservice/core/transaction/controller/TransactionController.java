@@ -3,7 +3,7 @@ package com.skyflytech.accountservice.core.transaction.controller;
 import com.mongodb.client.result.DeleteResult;
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
-import com.skyflytech.accountservice.core.transaction.service.TransactionService;
+import com.skyflytech.accountservice.core.transaction.service.imp.TransactionServiceImp;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -38,15 +38,15 @@ import java.util.Map;
 @Tag(name = "Transaction API", description = "API for managing transactions")
 public class TransactionController {
 
-    private final TransactionService transactionService;
+    private final TransactionServiceImp transactionServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final MongoOperations mongoOperations;
 
     @Value("${spring.profiles.active}")
     private String activeProfile;
     @Autowired
-    public TransactionController(TransactionService transactionService, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
-        this.transactionService = transactionService;
+    public TransactionController(TransactionServiceImp transactionServiceImp, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+        this.transactionServiceImp = transactionServiceImp;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.mongoOperations = mongoOperations;
     }
@@ -60,7 +60,7 @@ public class TransactionController {
     })
     @GetMapping("/all")
     public ResponseEntity<List<Transaction>> getAllTransactions() {
-        List<Transaction> transactions = transactionService.getAllTransactions(currentAccountSetIdHolder.getCurrentAccountSetId());
+        List<Transaction> transactions = transactionServiceImp.getAllTransactions(currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok(transactions);
     }
 
@@ -74,14 +74,14 @@ public class TransactionController {
     })
     @GetMapping("/search")
     public ResponseEntity<List<Transaction>> searchTransactions(@RequestParam("query") String query) {
-        List<Transaction> transactions = transactionService.searchTransactions(currentAccountSetIdHolder.getCurrentAccountSetId(),query);
+        List<Transaction> transactions = transactionServiceImp.searchTransactions(currentAccountSetIdHolder.getCurrentAccountSetId(),query);
         return ResponseEntity.ok(transactions);
     }
 
     @Operation(summary = "Get transactions by account ID", description = "Returns a list of transactions associated with the provided account ID.")
     @GetMapping("/{accountId}")
     public ResponseEntity<List<Transaction>> getTransactionsByAccountId(@PathVariable String accountId) {
-        List<Transaction> transactions = transactionService.findByAccountId(accountId);
+        List<Transaction> transactions = transactionServiceImp.findByAccountId(accountId);
         return ResponseEntity.ok(transactions);
     }
 
@@ -94,7 +94,7 @@ public class TransactionController {
             @RequestParam(defaultValue = "10") int size,
             PagedResourcesAssembler<Transaction> assembler) {
 
-        Page<Transaction> transactions = transactionService.findTransactionsByAccountAndPeriod(accountId, startDate, endDate, page, size);
+        Page<Transaction> transactions = transactionServiceImp.findTransactionsByAccountAndPeriod(accountId, startDate, endDate, page, size);
         PagedModel<EntityModel<Transaction>> pagedModel = assembler.toModel(transactions);
 
         return ResponseEntity.ok(pagedModel);
@@ -104,7 +104,7 @@ public class TransactionController {
             @PathVariable String accountId,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate modifiedDate) {
 
-        Map.Entry<BigDecimal, BigDecimal> totals = transactionService.calculateTotalDebitAndCredit(accountId, modifiedDate);
+        Map.Entry<BigDecimal, BigDecimal> totals = transactionServiceImp.calculateTotalDebitAndCredit(accountId, modifiedDate);
         return ResponseEntity.ok(totals);
     }
 

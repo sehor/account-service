@@ -1,4 +1,4 @@
-package com.skyflytech.accountservice.core.report.service;
+package com.skyflytech.accountservice.core.report.service.imp;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 
 @Service
-public class ReportService {
-    public ReportService() {
+public class ReportServiceImp {
+    public ReportServiceImp() {
     }
 
     public void initializeDefaultIncomeStatementItems(IncomeStatement incomeStatement) {

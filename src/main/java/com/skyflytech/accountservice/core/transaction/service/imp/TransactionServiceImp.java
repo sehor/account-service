@@ -1,6 +1,6 @@
-package com.skyflytech.accountservice.core.transaction.service;
+package com.skyflytech.accountservice.core.transaction.service.imp;
 
-import com.skyflytech.accountservice.core.account.service.AccountService;
+import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.account.model.Account;
@@ -29,19 +29,19 @@ import java.util.stream.Collectors;
  * @Description:
  **/
 @Service
-public class TransactionService {
+public class TransactionServiceImp {
     private final TransactionMongoRepository transactionRepository;
     private final MongoOperations mongoOperations;
-    private final AccountService accountService;
+    private final AccountServiceImp accountServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
     @Autowired
-    public TransactionService(TransactionMongoRepository transactionRepository, MongoOperations mongoOperations,CurrentAccountSetIdHolder currentAccountSetIdHolder,AccountService accountService) {  
+    public TransactionServiceImp(TransactionMongoRepository transactionRepository, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder, AccountServiceImp accountServiceImp) {
 
         this.transactionRepository = transactionRepository;
         this.mongoOperations = mongoOperations;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
-        this.accountService = accountService;
+        this.accountServiceImp = accountServiceImp;
     }
 
     public List<Transaction> getAllTransactions(String accountSetId) {
@@ -62,7 +62,7 @@ public class TransactionService {
         Pageable pageable = PageRequest.of(page, size);
         
         // 获取所有叶子子账户（包括当前账户，如果它是叶子账户）
-        List<Account> leafAccounts = accountService.getLeafSubAccounts(accountId);
+        List<Account> leafAccounts = accountServiceImp.getLeafSubAccounts(accountId);
         List<String> leafAccountIds = leafAccounts.stream()
                 .map(Account::getId)
                 .collect(Collectors.toList());

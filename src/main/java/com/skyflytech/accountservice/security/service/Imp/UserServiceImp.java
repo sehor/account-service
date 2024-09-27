@@ -1,4 +1,4 @@
-package com.skyflytech.accountservice.security.service;
+package com.skyflytech.accountservice.security.service.Imp;
 
 import com.skyflytech.accountservice.security.model.User;
 import com.skyflytech.accountservice.security.repository.UserRepository;
@@ -14,13 +14,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 @Service
-public class UserService {
+public class UserServiceImp {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImp.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    public UserService(UserRepository userRepository) {
+    public UserServiceImp(UserRepository userRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = new BCryptPasswordEncoder(); // 在这里创建新的 PasswordEncoder
     }

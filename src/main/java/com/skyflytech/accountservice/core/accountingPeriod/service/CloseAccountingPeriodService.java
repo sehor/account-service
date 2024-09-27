@@ -2,6 +2,7 @@ package com.skyflytech.accountservice.core.accountingPeriod.service;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
+import com.skyflytech.accountservice.core.accountingPeriod.service.imp.AccountingPeriodServiceImp;
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.account.model.Account;
 import com.skyflytech.accountservice.core.account.model.AccountType;
@@ -11,7 +12,7 @@ import com.skyflytech.accountservice.core.journalEntry.model.JournalEntryView;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.core.accountingPeriod.repository.AccountingPeriodRepository;
 
-import com.skyflytech.accountservice.core.journalEntry.service.JournalEntryService;
+import com.skyflytech.accountservice.core.journalEntry.service.imp.JournalEntryServiceImp;
 import com.skyflytech.accountservice.core.journalEntry.service.ProcessJournalEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,21 +38,21 @@ public class CloseAccountingPeriodService {
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final ProcessJournalEntry processJournalEntryService;
     private final MongoTemplate mongoTemplate;
-    private final AccountingPeriodService accountingPeriodService;
-    private final JournalEntryService journalEntryService;
+    private final AccountingPeriodServiceImp accountingPeriodServiceImp;
+    private final JournalEntryServiceImp journalEntryServiceImp;
 
     @Autowired
     public CloseAccountingPeriodService(AccountingPeriodRepository accountingPeriodRepository,
             ProcessJournalEntry processJournalEntryService,
-            AccountingPeriodService accountingPeriodService,
+            AccountingPeriodServiceImp accountingPeriodServiceImp,
             MongoTemplate mongoTemplate,
-            JournalEntryService journalEntryService
+            JournalEntryServiceImp journalEntryServiceImp
             ) {
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.processJournalEntryService = processJournalEntryService;
-        this.journalEntryService = journalEntryService;
+        this.journalEntryServiceImp = journalEntryServiceImp;
         this.mongoTemplate = mongoTemplate;
-        this.accountingPeriodService = accountingPeriodService;
+        this.accountingPeriodServiceImp = accountingPeriodServiceImp;
     }
 
     @Transactional
@@ -60,9 +61,9 @@ public class CloseAccountingPeriodService {
                 .orElseThrow(() -> new RuntimeException("会计期间不存在"));
 
             // 检查是否存在下一个会计期间,如果不存在则创建一个新的会计期间 
-        AccountingPeriod newPeriod = accountingPeriodService.findNextPeriod(currentPeriod);
+        AccountingPeriod newPeriod = accountingPeriodServiceImp.findNextPeriod(currentPeriod);
         if (newPeriod == null) {
-            newPeriod = accountingPeriodService.createNextAccountingPeriod(currentPeriod);
+            newPeriod = accountingPeriodServiceImp.createNextAccountingPeriod(currentPeriod);
         }
 
         return newPeriod;
@@ -149,7 +150,7 @@ public class CloseAccountingPeriodService {
     //检查凭证号是否连续
     public boolean checkVoucherWordIsContinuous(String periodId){
         AccountingPeriod period = accountingPeriodRepository.findById(periodId).orElseThrow(() -> new RuntimeException("会计期间不存在"));
-        return journalEntryService.isVoucherNumContinuous(period);
+        return journalEntryServiceImp.isVoucherNumContinuous(period);
     }
     private Transaction createTransaction(Account account, BigDecimal amount, boolean isDebit, String description) {
         LocalDate now = LocalDate.now();

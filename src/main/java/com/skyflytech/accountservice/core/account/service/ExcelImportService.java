@@ -1,10 +1,10 @@
 package com.skyflytech.accountservice.core.account.service;
 
+import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
 import com.skyflytech.accountservice.core.account.model.Account;
 import com.skyflytech.accountservice.core.account.model.AccountState;
 import com.skyflytech.accountservice.core.account.model.AccountType;
 import com.skyflytech.accountservice.core.account.model.AccountingDirection;
-import com.skyflytech.accountservice.core.account.service.AccountService;
 import com.skyflytech.accountservice.global.GlobalConst;
 import com.skyflytech.accountservice.core.account.repository.AccountMongoRepository;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
@@ -23,14 +23,14 @@ import java.util.*;
 public class ExcelImportService {
 
     private final AccountMongoRepository accountMongoRepository;
-    private final AccountService accountService;
+    private final AccountServiceImp accountServiceImp;
 
     @Autowired
     public ExcelImportService(AccountMongoRepository accountMongoRepository,
             CurrentAccountSetIdHolder currentAccountSetIdHolder,
-            AccountService accountService) {
+            AccountServiceImp accountServiceImp) {
         this.accountMongoRepository = accountMongoRepository;
-        this.accountService = accountService;
+        this.accountServiceImp = accountServiceImp;
     }
 
     @Transactional
@@ -93,7 +93,7 @@ public class ExcelImportService {
                 account.setState(existingAccount.getState());
                 accountsToBeUpdated.add(account);
             } else {
-                accountService.validateAndSetAccountLevel(account);
+                accountServiceImp.validateAndSetAccountLevel(account);
                 account.setState(AccountState.ACTIVE);
                 accountsToBeCreated.add(account);
             }

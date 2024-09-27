@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.security.jwt;
 
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.UserService;
+import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,11 +24,11 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenFilter.class);
 
     private final JwtUtil jwtUtil;
-    private final UserService userService;
+    private final UserServiceImp userServiceImp;
 
-    public JwtTokenFilter(JwtUtil jwtUtil, UserService userService) {
+    public JwtTokenFilter(JwtUtil jwtUtil, UserServiceImp userServiceImp) {
         this.jwtUtil = jwtUtil;
-        this.userService = userService;
+        this.userServiceImp = userServiceImp;
     }
 
     @Override
@@ -68,7 +68,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
     private void setSecurityContext(String token) {
         String username = jwtUtil.extractUsername(token);
-        User user = userService.getUserByUsername(username);
+        User user = userServiceImp.getUserByUsername(username);
         
         String currentAccountSetId = user.getCurrentAccountSetId();
         List<String> accountSetIds = user.getAccountSetIds();

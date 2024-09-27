@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.core.accountingPeriod.controller;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-import com.skyflytech.accountservice.core.accountingPeriod.service.AccountingPeriodService;
+import com.skyflytech.accountservice.core.accountingPeriod.service.imp.AccountingPeriodServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.service.CloseAccountingPeriodService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,7 @@ public class AccountingPeriodController {
 
     private final CloseAccountingPeriodService closeAccountingPeriodService;
     @Autowired
-    public AccountingPeriodController(CloseAccountingPeriodService closeAccountingPeriodService, AccountingPeriodService accountingPeriodService) {
+    public AccountingPeriodController(CloseAccountingPeriodService closeAccountingPeriodService, AccountingPeriodServiceImp accountingPeriodServiceImp) {
         this.closeAccountingPeriodService = closeAccountingPeriodService;
     }
 

@@ -3,7 +3,7 @@ package com.skyflytech.accountservice.security.controller;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import com.skyflytech.accountservice.security.jwt.JwtUtil;
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.UserService;
+import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,13 +33,13 @@ import java.util.Map;
 public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final JwtUtil jwtUtil;
-    private final UserService userService;
+    private final UserServiceImp userServiceImp;
     private final AuthenticationManager authenticationManager;
 
     @Autowired
-    public AuthController(JwtUtil jwtUtil, UserService userService, AuthenticationManager authenticationManager) {
+    public AuthController(JwtUtil jwtUtil, UserServiceImp userServiceImp, AuthenticationManager authenticationManager) {
         this.jwtUtil = jwtUtil;
-        this.userService = userService;
+        this.userServiceImp = userServiceImp;
         this.authenticationManager = authenticationManager;
     }
 
@@ -61,7 +61,7 @@ public class AuthController {
             try {
                 // 从token中提取信息
                 String username = jwtUtil.extractUsername(accessToken);
-                User user=userService.getUserByUsername(username);
+                User user= userServiceImp.getUserByUsername(username);
                 if(user==null){
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "未认证", "message", "用户未登录或会话已过期"));
@@ -96,7 +96,7 @@ public class AuthController {
         logger.info("registerUser: " + user.getUsername());
        
         try {
-            User registeredUser = userService.registerUser(user);
+            User registeredUser = userServiceImp.registerUser(user);
             return ResponseEntity.ok(registeredUser);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -172,7 +172,7 @@ public class AuthController {
         String refreshToken = getCookieValue(request, "refresh_token");
         if (refreshToken != null) {
             String username = jwtUtil.extractUsername(refreshToken);
-            UserDetails userDetails = userService.getUserByUsername(username);
+            UserDetails userDetails = userServiceImp.getUserByUsername(username);
             if (jwtUtil.validateToken(refreshToken, userDetails)) {
                 String newAccessToken = jwtUtil.generateToken(userDetails);
                 jwtUtil.addTokenCookie(response, "access_token", newAccessToken, false);

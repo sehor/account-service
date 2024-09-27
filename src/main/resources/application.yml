@@ -7,25 +7,25 @@ springdoc:
   group-configs:
     - group: 'account'
       paths-to-match: "/api/accounts/**" # Only match endpoints with /accounts/
-      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+      packages-to-scan: com.skyflytech.accountservice.core.account.controller  # Only scan this package for API endpoints
     - group: 'accountSet'
       paths-to-match: "/api/account-sets/**" # Only match endpoints with /account-sets/
-      packages-to-scan: com.skyflytech.accountservice.controller       
+      packages-to-scan: com.skyflytech.accountservice.core.accountSet.controller
     - group: 'transaction'
       paths-to-match: "/api/transactions/**" # Only match endpoints with /transactions/
-      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+      packages-to-scan: com.skyflytech.accountservice.core.transaction.controller  # Only scan this package for API endpoints
     - group: 'journalEntry'
       paths-to-match: "/api/journalEntries/**" # Only match endpoints with /journalEntries/
-      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+      packages-to-scan: com.skyflytech.accountservice.core.journalEntry.controller  # Only scan this package for API endpoints
     - group: 'accountingPeriod'
       paths-to-match: "/api/accounting-periods/**" # Only match endpoints with /accounting-periods/
-      packages-to-scan: com.skyflytech.accountservice.controller 
+      packages-to-scan: com.skyflytech.accountservice.core.accountingPeriod.controller
     - group: 'auth'
       paths-to-match: "/api/auth/**" # Only match endpoints with /auth/
-      packages-to-scan: com.skyflytech.accountservice.security    
+      packages-to-scan: com.skyflytech.accountservice.security.controller
     - group: 'report'
       paths-to-match: "/api/reports/**" # Only match endpoints with /reports/
-      packages-to-scan: com.skyflytech.accountservice.controller  # Only scan this package for API endpoints
+      packages-to-scan: com.skyflytech.accountservice.core.report.controller  # Only scan this package for API endpoints
 
 # knife4j的增强配置，不需要增强可以不配
 knife4j:

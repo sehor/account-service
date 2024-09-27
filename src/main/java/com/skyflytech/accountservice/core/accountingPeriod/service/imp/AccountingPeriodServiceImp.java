@@ -1,6 +1,6 @@
-package com.skyflytech.accountservice.core.accountingPeriod.service;
+package com.skyflytech.accountservice.core.accountingPeriod.service.imp;
 
-import com.skyflytech.accountservice.core.account.service.AccountService;
+import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountSet.model.AccountSet;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
@@ -34,19 +34,19 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
-public class AccountingPeriodService {
+public class AccountingPeriodServiceImp {
 
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final MongoTemplate mongoTemplate;
-    private final AccountService accountService;
+    private final AccountServiceImp accountServiceImp;
 
     @Autowired
-    public AccountingPeriodService(AccountingPeriodRepository accountingPeriodRepository,
-            MongoTemplate mongoTemplate,
-            AccountService accountService) {
+    public AccountingPeriodServiceImp(AccountingPeriodRepository accountingPeriodRepository,
+                                      MongoTemplate mongoTemplate,
+                                      AccountServiceImp accountServiceImp) {
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
-        this.accountService = accountService;
+        this.accountServiceImp = accountServiceImp;
     }
 
     public AccountingPeriod createInitialPeriod(AccountSet accountSet, YearMonth startMonth) {
@@ -209,7 +209,7 @@ public class AccountingPeriodService {
     }
 
     private List<String> getRelatedAccountIds(String accountId) {
-        return accountService.findAccountAndAllAncestors(accountId).stream()
+        return accountServiceImp.findAccountAndAllAncestors(accountId).stream()
                 .map(Account::getId)
                 .collect(Collectors.toList());
     }

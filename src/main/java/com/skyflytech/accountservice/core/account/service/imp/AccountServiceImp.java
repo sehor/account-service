@@ -1,4 +1,4 @@
-package com.skyflytech.accountservice.core.account.service;
+package com.skyflytech.accountservice.core.account.service.imp;
 
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountSet.model.AccountSet;
@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 import static com.mongodb.internal.authentication.AwsCredentialHelper.LOGGER;
 
 @Service
-public class AccountService {
+public class AccountServiceImp {
 
     private final AccountMongoRepository accountMongoRepository;
     private final AccountingPeriodRepository accountingPeriodRepository;
@@ -37,11 +37,11 @@ public class AccountService {
     private final TransactionMongoRepository transactionMongoRepository;
 
     @Autowired
-    public AccountService(AccountMongoRepository accountMongoRepository,
-            AccountingPeriodRepository accountingPeriodRepository,
-            MongoTemplate mongoTemplate,
-            CurrentAccountSetIdHolder currentAccountSetIdHolder,
-            TransactionMongoRepository transactionMongoRepository) {
+    public AccountServiceImp(AccountMongoRepository accountMongoRepository,
+                             AccountingPeriodRepository accountingPeriodRepository,
+                             MongoTemplate mongoTemplate,
+                             CurrentAccountSetIdHolder currentAccountSetIdHolder,
+                             TransactionMongoRepository transactionMongoRepository) {
 
         this.accountMongoRepository = accountMongoRepository;
         this.accountingPeriodRepository = accountingPeriodRepository;

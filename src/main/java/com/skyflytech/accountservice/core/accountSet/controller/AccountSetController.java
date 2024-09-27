@@ -5,8 +5,8 @@ import com.skyflytech.accountservice.security.jwt.JwtUtil;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.UserService;
-import com.skyflytech.accountservice.core.accountSet.service.AccountSetService;
+import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
+import com.skyflytech.accountservice.core.accountSet.service.imp.AccountSetServiceImp;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,15 +20,15 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/account-sets")
 public class AccountSetController {
-    private final AccountSetService accountSetService;
+    private final AccountSetServiceImp accountSetService;
     private final JwtUtil jwtUtil;
-    private final UserService userService;
+    private final UserServiceImp userServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
-    public AccountSetController(AccountSetService accountSetService, JwtUtil jwtUtil, UserService userService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public AccountSetController(AccountSetServiceImp accountSetService, JwtUtil jwtUtil, UserServiceImp userServiceImp, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.accountSetService = accountSetService;
         this.jwtUtil = jwtUtil;
-        this.userService = userService;
+        this.userServiceImp = userServiceImp;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
@@ -38,7 +38,7 @@ public class AccountSetController {
         String userName = SecurityContextHolder.getContext().getAuthentication().getName();
         AccountSet createdAccountSet = accountSetService.createAccountSet(accountSet,userName);
         //set cookies and set security context
-        User user = userService.getUserByUsername(userName);
+        User user = userServiceImp.getUserByUsername(userName);
         jwtUtil.setCookiesAndSecurityContext(response, user, false);
         return new ResponseEntity<>(createdAccountSet, HttpStatus.CREATED);
     }
@@ -56,7 +56,7 @@ public class AccountSetController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof CustomAuthentication) {
             CustomAuthentication customAuth = (CustomAuthentication) auth;
-            User user = userService.getUserByUsername(customAuth.getName());
+            User user = userServiceImp.getUserByUsername(customAuth.getName());
             if (customAuth.getAccountSetIds().contains(id)) {
               User update_user  =accountSetService.deleteAccountSet(id,user);
               //set cookies and set security context
@@ -74,10 +74,10 @@ public class AccountSetController {
             String username = customAuth.getName();
             
             try {
-                User user = userService.getUserByUsername(username);
+                User user = userServiceImp.getUserByUsername(username);
                 
                 if (user.getAccountSetIds().contains(id)) {
-                    user = userService.updateUserCurrentAccountSetId(username, id);
+                    user = userServiceImp.updateUserCurrentAccountSetId(username, id);
                     
               //set cookies and set security context
               jwtUtil.setCookiesAndSecurityContext(response, user, false);
