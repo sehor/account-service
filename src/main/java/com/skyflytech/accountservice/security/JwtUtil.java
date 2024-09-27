@@ -6,7 +6,6 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,14 +13,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -44,20 +41,7 @@ public class JwtUtil {
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
-        if (userDetails instanceof User) {
-            User user = (User) userDetails;
-            claims.put("currentAccountSetId", user.getCurrentAccountSetId());
-            claims.put("accountSetIds", user.getAccountSetIds());
-        }
         return createToken(claims, userDetails.getUsername());
-    }
-
-    public String generateToken(OAuth2User oauth2User) {
-        Map<String, Object> claims = new HashMap<>();
-        // Add relevant OAuth2User details to claims
-        claims.put("email", oauth2User.getAttribute("email"));
-        claims.put("name", oauth2User.getAttribute("name"));
-        return createToken(claims, oauth2User.getName());
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
@@ -117,18 +101,6 @@ public class JwtUtil {
             return bearerToken.substring(7);
         }
         return null;
-    }
-
-    public String extractCurrentAccountSetId(String token) {
-        return extractClaim(token, claims -> claims.get("currentAccountSetId", String.class));
-    }
-
-    public List<String> extractAccountSetIds(String token) {
-        return extractClaim(token, claims -> {
-            @SuppressWarnings("unchecked")
-            List<String> accountSetIds = (List<String>) claims.get("accountSetIds");
-            return accountSetIds;
-        });
     }
 
     public String refreshAccessToken(String refreshToken) {

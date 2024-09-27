@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -56,19 +57,20 @@ public class AuthController {
             try {
                 // 从token中提取信息
                 String username = jwtUtil.extractUsername(accessToken);
-                String currentAccountSetId = jwtUtil.extractCurrentAccountSetId(accessToken);
-                List<String> accountSetIds = jwtUtil.extractAccountSetIds(accessToken);
+                User user=userService.getUserByUsername(username);
+                if(user==null){
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "未认证", "message", "用户未登录或会话已过期"));
+                }
+                String currentAccountSetId = user.getCurrentAccountSetId();
+                List<String> accountSetIds = user.getAccountSetIds();
 
                 response.put("username", username);
                 response.put("currentAccountSetId", currentAccountSetId);
                 response.put("accountSetIds", accountSetIds);
-
-                // 如果需要额外的用户信息，可以从数据库中获取
-                User user = userService.getUserByUsername(username);
-                if (user != null) {
-                    response.put("email", user.getEmail());
-                    // 添加其他需要的用户信息
-                }
+                response.put("email", user.getEmail());
+                
+                
             } catch (Exception e) {
                 logger.error("Error extracting information from JWT", e);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("处理用户信息时出错");
@@ -152,7 +154,10 @@ public class AuthController {
                 logger.error("Authentication principal is not of expected User type: " + username);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
             }
-        } catch (AuthenticationException e) {
+        }catch (BadCredentialsException e1){
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "username or password is not correct", "status", 401));
+        }
+        catch (AuthenticationException e) {
             logger.error("User login failed: " + username, e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid username or password", "status", 401));
         }       

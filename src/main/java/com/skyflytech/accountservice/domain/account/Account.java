@@ -8,8 +8,6 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import com.skyflytech.accountservice.security.AccountSetIdAware;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
@@ -20,7 +18,7 @@ import java.util.Objects;
 @NoArgsConstructor
 @Document(collection = "accounts")
 @CompoundIndex(name = "accountSet_date_idx", def = "{'accountSetId': 1}")
-public class Account implements AccountSetIdAware{
+public class Account {
 
     @Id
     private String id;

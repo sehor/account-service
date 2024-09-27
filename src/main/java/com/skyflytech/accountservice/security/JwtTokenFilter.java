@@ -9,8 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -23,11 +21,11 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenFilter.class);
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
+    private final UserService userService;
 
-    public JwtTokenFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
+    public JwtTokenFilter(JwtUtil jwtUtil, UserService userService) {
         this.jwtUtil = jwtUtil;
-        this.userDetailsService = userDetailsService;
+        this.userService = userService;
     }
 
     @Override
@@ -48,7 +46,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     String newAccessToken = jwtUtil.refreshAccessToken(refreshToken);
                     if (newAccessToken != null) {
                         accessToken = newAccessToken;
-                        addTokenCookie(response, "access_token", newAccessToken, false);
+                        addTokenCookie(response, newAccessToken);
                         
                         // 在这里设置安全上下文
                         setSecurityContext(newAccessToken);
@@ -67,13 +65,13 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
     private void setSecurityContext(String token) {
         String username = jwtUtil.extractUsername(token);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        User user = userService.getUserByUsername(username);
         
-        String currentAccountSetId = jwtUtil.extractCurrentAccountSetId(token);
-        List<String> accountSetIds = jwtUtil.extractAccountSetIds(token);
+        String currentAccountSetId = user.getCurrentAccountSetId();
+        List<String> accountSetIds = user.getAccountSetIds();
         
         CustomAuthentication authentication = new CustomAuthentication(
-            userDetails, null, userDetails.getAuthorities(),
+            user, null, user.getAuthorities(),
             currentAccountSetId, accountSetIds);
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
@@ -90,9 +88,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private void addTokenCookie(HttpServletResponse response, String name, String value, boolean isRememberMe) {
-        int maxAge = isRememberMe ? 7 * 24 * 60 * 60 : -1; // 7天或会话结束
-        Cookie cookie = new Cookie(name, value);
+    private void addTokenCookie(HttpServletResponse response, String value) {
+        int maxAge = -1; // 7天或会话结束
+        Cookie cookie = new Cookie("access_token", value);
         cookie.setHttpOnly(true);
         cookie.setSecure(true); // 如果不是 HTTPS，考虑设置为 false
         cookie.setPath("/");
