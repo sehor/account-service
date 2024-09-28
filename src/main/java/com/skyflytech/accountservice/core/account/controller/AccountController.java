@@ -1,12 +1,11 @@
 package com.skyflytech.accountservice.core.account.controller;
 
 import com.mongodb.client.result.DeleteResult;
-import com.skyflytech.accountservice.viewers.APIResponse;
 import com.skyflytech.accountservice.core.account.model.Account;
-import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
-import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
+import com.skyflytech.accountservice.core.account.service.AccountService;
 import com.skyflytech.accountservice.core.account.service.ExcelImportService;
-
+import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
+import com.skyflytech.accountservice.viewers.APIResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,11 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.math.BigDecimal;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Tag(name = "account")
@@ -28,18 +26,20 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/accounts")
 public class AccountController {
 
-    private final AccountServiceImp accountServiceImp;
+    private final AccountService accountService;
     private final MongoOperations mongoOperations;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final ExcelImportService excelImportService;
+
+
     
     @Value("${spring.profiles.active}")
     private String activeProfile;
 
-    public AccountController(MongoOperations mongoOperations, AccountServiceImp accountServiceImp, CurrentAccountSetIdHolder currentAccountSetIdHolder, ExcelImportService excelImportService) {
+    public AccountController(MongoOperations mongoOperations,AccountService accountService, CurrentAccountSetIdHolder currentAccountSetIdHolder, ExcelImportService excelImportService) {
         this.excelImportService = excelImportService;
         this.mongoOperations = mongoOperations;
-        this.accountServiceImp = accountServiceImp;
+        this.accountService = accountService;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
@@ -67,7 +67,7 @@ public class AccountController {
 
     @GetMapping("/all")
     public ResponseEntity<List<Account>> getAllAccounts() {
-        List<Account> accounts = accountServiceImp.getAllAccounts(currentAccountSetIdHolder.getCurrentAccountSetId());
+        List<Account> accounts = accountService.getAllAccounts(currentAccountSetIdHolder.getCurrentAccountSetId());
         // 限制返回的账户数量为50个
         List<Account> limitedAccounts = accounts.stream().limit(50).collect(Collectors.toList());
         return ResponseEntity.ok(limitedAccounts);
@@ -75,7 +75,7 @@ public class AccountController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getAccountById(@PathVariable String id) {
-        Account account = accountServiceImp.getAccountById(id);
+        Account account = accountService.getAccountById(id);
         if (account != null) {
 
             return ResponseEntity.ok(account);
@@ -87,7 +87,7 @@ public class AccountController {
     @PostMapping("/create")
     public ResponseEntity<APIResponse<Account>> createAccount(@RequestBody Account account) {
         account.setAccountSetId(currentAccountSetIdHolder.getCurrentAccountSetId());
-        Account create = accountServiceImp.createAccount(account);
+        Account create = accountService.createAccount(account);
         if(create==null){
             return ResponseEntity.badRequest().body(null);
         }
@@ -97,7 +97,7 @@ public class AccountController {
     @PutMapping("/update")
     public ResponseEntity<?> updateAccount( @RequestBody Account account) {
         try {
-            Account updatedAccount = accountServiceImp.updateAccount(account);
+            Account updatedAccount = accountService.updateAccount(account);
             return ResponseEntity.ok(updatedAccount);
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Account not found.");
@@ -106,30 +106,16 @@ public class AccountController {
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAccount(@PathVariable String id) {
-       
-            accountServiceImp.deleteAccount(id);
+
+        accountService.deleteAccount(id);
             return ResponseEntity.ok("Account deleted successfully.");
     
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<Account>> searchAccounts(@RequestParam("query") String query) {
-        List<Account> accounts = accountServiceImp.searchAccounts(query,currentAccountSetIdHolder.getCurrentAccountSetId());
+        List<Account> accounts = accountService.searchAccounts(query,currentAccountSetIdHolder.getCurrentAccountSetId());
         return ResponseEntity.ok(accounts);
-    }
-
-    @GetMapping("/{id}/leaf-subaccounts")
-    public ResponseEntity<APIResponse<List<Account>>> getLeafSubAccounts(@PathVariable String id) {
-        try {
-            List<Account> leafSubAccounts = accountServiceImp.getLeafSubAccounts(id);
-            return ResponseEntity.ok(new APIResponse<>("叶子子科目获取成功", leafSubAccounts));
-        } catch (NoSuchElementException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new APIResponse<>("未找到指定的科目", null));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new APIResponse<>("获取叶子子科目时发生错误", null));
-        }
     }
 
     //warn : just for developing stage and test
@@ -143,15 +129,5 @@ public class AccountController {
         long deletedCount = result.getDeletedCount();
         return ResponseEntity.ok(String.format("deleted %d records successfully!",deletedCount));
     }
- 
 
-    @PostMapping("/initializeOpeningBalances")
-    public ResponseEntity<?> initializeOpeningBalances(
-            @RequestBody Map<String, BigDecimal> openingBalances) {
-   
-            String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId(); //for test
-            accountServiceImp.initializeOpeningBalances(accountSetId, openingBalances);
-            return ResponseEntity.ok("初始化成功");
-      
-    }
 }

@@ -69,7 +69,7 @@ public class ExcelImportService {
     }
 
     @Transactional
-    private void processImportedAccounts(List<Account> accounts, String accountSetId) {
+    public void processImportedAccounts(List<Account> accounts, String accountSetId) {
         // find all accounts in this accountSet
         List<Account> allOriginalAccounts = accountMongoRepository.findByAccountSetId(accountSetId);
         //create a code map for allOriginalAccounts

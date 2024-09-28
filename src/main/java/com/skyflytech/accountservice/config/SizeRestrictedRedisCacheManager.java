@@ -6,6 +6,7 @@ import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SizeRestrictedRedisCacheManager extends RedisCacheManager {
@@ -55,7 +56,7 @@ public class SizeRestrictedRedisCacheManager extends RedisCacheManager {
         }
 
         private void evictOldestEntry() {
-            Object oldestKey = redisTemplate.opsForZSet().range(getName(), 0, 0).iterator().next();
+            Object oldestKey = Objects.requireNonNull(redisTemplate.opsForZSet().range(getName(), 0, 0)).iterator().next();
             delegate.evict(oldestKey);
         }
 

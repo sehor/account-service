@@ -1,12 +1,12 @@
 package com.skyflytech.accountservice.core.accountSet.controller;
 
 import com.skyflytech.accountservice.core.accountSet.model.AccountSet;
+import com.skyflytech.accountservice.core.accountSet.service.AccountSetService;
 import com.skyflytech.accountservice.security.jwt.JwtUtil;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
-import com.skyflytech.accountservice.core.accountSet.service.imp.AccountSetServiceImp;
+import com.skyflytech.accountservice.security.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,20 +15,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 @RestController
 @RequestMapping("/api/account-sets")
 public class AccountSetController {
-    private final AccountSetServiceImp accountSetService;
+    private final AccountSetService accountSetService;
     private final JwtUtil jwtUtil;
-    private final UserServiceImp userServiceImp;
+    private final UserService userService;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
-    public AccountSetController(AccountSetServiceImp accountSetService, JwtUtil jwtUtil, UserServiceImp userServiceImp, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
+    public AccountSetController(AccountSetService accountSetService, JwtUtil jwtUtil, UserService userService, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
         this.accountSetService = accountSetService;
         this.jwtUtil = jwtUtil;
-        this.userServiceImp = userServiceImp;
+        this.userService = userService;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
     }
 
@@ -38,7 +39,7 @@ public class AccountSetController {
         String userName = SecurityContextHolder.getContext().getAuthentication().getName();
         AccountSet createdAccountSet = accountSetService.createAccountSet(accountSet,userName);
         //set cookies and set security context
-        User user = userServiceImp.getUserByUsername(userName);
+        User user = userService.getUserByUsername(userName);
         jwtUtil.setCookiesAndSecurityContext(response, user, false);
         return new ResponseEntity<>(createdAccountSet, HttpStatus.CREATED);
     }
@@ -54,9 +55,8 @@ public class AccountSetController {
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteAccountSet(@PathVariable String id, HttpServletResponse response) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof CustomAuthentication) {
-            CustomAuthentication customAuth = (CustomAuthentication) auth;
-            User user = userServiceImp.getUserByUsername(customAuth.getName());
+        if (auth instanceof CustomAuthentication customAuth) {
+            User user = userService.getUserByUsername(customAuth.getName());
             if (customAuth.getAccountSetIds().contains(id)) {
               User update_user  =accountSetService.deleteAccountSet(id,user);
               //set cookies and set security context
@@ -74,10 +74,10 @@ public class AccountSetController {
             String username = customAuth.getName();
             
             try {
-                User user = userServiceImp.getUserByUsername(username);
+                User user = userService.getUserByUsername(username);
                 
                 if (user.getAccountSetIds().contains(id)) {
-                    user = userServiceImp.updateUserCurrentAccountSetId(username, id);
+                    user = userService.updateUserCurrentAccountSetId(username, id);
                     
               //set cookies and set security context
               jwtUtil.setCookiesAndSecurityContext(response, user, false);
@@ -102,5 +102,15 @@ public class AccountSetController {
     public ResponseEntity<AccountSet> getAccountSetById(@PathVariable String id) {
         AccountSet accountSet = accountSetService.getAccountSetById(id);
         return new ResponseEntity<>(accountSet, HttpStatus.OK);
+    }
+
+    @PostMapping("/initializeOpeningBalances")
+    public ResponseEntity<?> initializeOpeningBalances(
+            @RequestBody Map<String, BigDecimal> openingBalances) {
+
+        String accountSetId = currentAccountSetIdHolder.getCurrentAccountSetId(); //for test
+        accountSetService.initializeOpeningBalances(accountSetId, openingBalances);
+        return ResponseEntity.ok("初始化成功");
+
     }
 }

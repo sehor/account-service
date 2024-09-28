@@ -75,7 +75,7 @@ public class CloseAccountingPeriodService {
                 .orElseThrow(() -> new RuntimeException("会计期间不存在"));
         String accountSetId = period.getAccountSetId();
         List<Account> allAccounts = findAllLeafAccountsForClosingPeriod(accountSetId);
-        Account profitAccount = findAccountByCode(allAccounts, GlobalConst.CURRENT_YEAR_PROFIT_CODE);
+        Account profitAccount = findProfitAccounts(allAccounts);
         List<JournalEntryView> journalEntryViews = new ArrayList<>();
         // 结转收入
         journalEntryViews.add(transferIncomeAccounts(findIncomeAccounts(allAccounts), period, profitAccount));
@@ -270,11 +270,11 @@ public class CloseAccountingPeriodService {
         return new JournalEntryView(createJournalEntry(period.getAccountSetId(), "结转以前年度损益调整"), transactions);
     }
 
-    private Account findAccountByCode(List<Account> accounts, String code) {
+    private Account findProfitAccounts(List<Account> accounts) {
         return accounts.stream()
-                .filter(account -> code.equals(account.getCode()))
+                .filter(account -> GlobalConst.CURRENT_YEAR_PROFIT_CODE.equals(account.getCode()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("not found account,the code is: " + code));
+                .orElseThrow(() -> new RuntimeException("not found account,the code is: " + GlobalConst.CURRENT_YEAR_PROFIT_CODE));
     }
 
 

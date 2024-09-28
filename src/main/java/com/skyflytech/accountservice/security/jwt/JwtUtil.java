@@ -1,12 +1,11 @@
 package com.skyflytech.accountservice.security.jwt;
 
-import com.skyflytech.accountservice.security.model.User;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
+import com.skyflytech.accountservice.security.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,14 +94,6 @@ public class JwtUtil {
 
     public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
-    }
-
-    public String getTokenFromRequest(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
     }
 
     public String refreshAccessToken(String refreshToken) {

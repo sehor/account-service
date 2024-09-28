@@ -1,7 +1,7 @@
 package com.skyflytech.accountservice.security.jwt;
 
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
+import com.skyflytech.accountservice.security.service.imp.UserServiceImp;
 import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -48,7 +48,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     
                     String newAccessToken = jwtUtil.refreshAccessToken(refreshToken);
                     if (newAccessToken != null) {
-                        accessToken = newAccessToken;
                         addTokenCookie(response, newAccessToken);
                         
                         // 在这里设置安全上下文

@@ -7,11 +7,13 @@ import com.skyflytech.accountservice.core.report.model.AccountingOperation;
 import com.skyflytech.accountservice.core.report.model.DataType;
 import com.skyflytech.accountservice.core.report.model.IncomeStatement;
 import com.skyflytech.accountservice.core.report.model.ReportItem;
+import com.skyflytech.accountservice.core.report.service.ReportService;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
-public class ReportServiceImp {
+public class ReportServiceImp implements ReportService {
     public ReportServiceImp() {
     }
 
@@ -76,16 +78,16 @@ public class ReportServiceImp {
             // 根据 operation 的类型进行计算
             switch (operation.getOperator().getSymbol()) {
                 case "+":
-                    result.add(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                   result= result.add(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
                     break;
                 case "-":
-                    result.subtract(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    result=result.subtract(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
                     break;
                 case "*":
-                    result.multiply(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    result=result.multiply(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
                     break;
                 case "/":
-                    result.divide(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()));
+                    result= result.divide(getAccountAmount(accountingPeriod,operation.getAccountId(),operation.getDataType()),4, RoundingMode.HALF_UP);
                     break;
             }
         }

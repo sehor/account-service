@@ -1,10 +1,7 @@
 package com.skyflytech.accountservice.core.transaction.repository;
 
 import com.skyflytech.accountservice.core.transaction.model.Transaction;
-import com.skyflytech.accountservice.core.journalEntry.model.JournalEntry;
-
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -23,8 +20,4 @@ public interface TransactionMongoRepository extends MongoRepository<Transaction,
     List<Transaction> findDebitsAndCreditsByAccountIdAndModifiedDateLessThan(String accountId, LocalDate modifiedDate);
 
     List<Transaction> findByAccountSetIdAndModifiedDateBetween(String accountSetId, LocalDate startDate, LocalDate endDate);
-      @Query("{'accountSetId': ?0, 'date': {$gte: ?1, $lte: ?2}}")
-    List<JournalEntry> findByAccountSetIdAndDateRange(String accountSetId, LocalDate startDate, LocalDate endDate);
-
-    void deleteByAccountSetId(String accountSetId);
 }

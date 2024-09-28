@@ -2,7 +2,7 @@ package com.skyflytech.accountservice.security;
 
 import com.skyflytech.accountservice.security.model.User;
 import com.skyflytech.accountservice.security.repository.UserRepository;
-import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
+import com.skyflytech.accountservice.security.service.imp.UserServiceImp;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,21 +1,27 @@
 package com.skyflytech.accountservice.core.report.controller;
 
-import com.skyflytech.accountservice.core.report.model.IncomeStatement;
-import com.skyflytech.accountservice.core.report.service.imp.ReportServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-
-import java.time.LocalDate;
-
+import com.skyflytech.accountservice.core.report.model.IncomeStatement;
+import com.skyflytech.accountservice.core.report.service.ReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/reports")
 public class ReportController {
 
+    private final ReportService reportService;
+
     @Autowired
-    private ReportServiceImp reportServiceImp;
+    public ReportController(ReportService reportService) {
+        this.reportService = reportService;
+    }
 
     @GetMapping("/income-statement")
     public ResponseEntity<IncomeStatement> getIncomeStatement(
@@ -33,7 +39,7 @@ public class ReportController {
         IncomeStatement incomeStatement = new IncomeStatement(accountSetId, begin, end);
 
         // 初始化默认项目
-        reportServiceImp.initializeDefaultIncomeStatementItems(incomeStatement);
+        reportService.initializeDefaultIncomeStatementItems(incomeStatement);
 
         // 这里应该添加从数据库或其他数据源获取实际数据的逻辑
         // 为了演示，我们只是设置一些示例数据
@@ -43,7 +49,7 @@ public class ReportController {
         // ... 设置其他项目的金额 ...
 
         // 计算利润表
-        reportServiceImp.calculateIncomeStatement(incomeStatement);
+        reportService.calculateIncomeStatement(incomeStatement);
 
         return ResponseEntity.ok(incomeStatement);
     }

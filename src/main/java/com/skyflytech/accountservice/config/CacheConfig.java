@@ -44,11 +44,13 @@ public class CacheConfig {
         cacheConfigurations.put("user", defaultCacheConfig.entryTtl(Duration.ofHours(12)));
         cacheConfigurations.put("accountSet", defaultCacheConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigurations.put("accountingPeriods", defaultCacheConfig.entryTtl(Duration.ofHours(2)));
+        cacheConfigurations.put("accounts", defaultCacheConfig.entryTtl(Duration.ofHours(2)));
 
         Map<String, Integer> cacheSizes = new HashMap<>();
         cacheSizes.put("user", 1000);
         cacheSizes.put("accountSet", 500);
         cacheSizes.put("accountingPeriods", 2000);
+        cacheSizes.put("accounts", 2000);
         return new SizeRestrictedRedisCacheManager(
             RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory),
             defaultCacheConfig,

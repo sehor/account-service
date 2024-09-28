@@ -1,13 +1,14 @@
 package com.skyflytech.accountservice.core.accountingPeriod.service.imp;
 
-import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
-import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
-import com.skyflytech.accountservice.core.accountSet.model.AccountSet;
-import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.account.model.Account;
 import com.skyflytech.accountservice.core.account.model.AccountingDirection;
+import com.skyflytech.accountservice.core.account.service.AccountService;
+import com.skyflytech.accountservice.core.accountSet.model.AccountSet;
+import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
+import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
 import com.skyflytech.accountservice.core.accountingPeriod.repository.AccountingPeriodRepository;
+import com.skyflytech.accountservice.core.accountingPeriod.service.AccountingPeriodService;
+import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -34,19 +35,19 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
-public class AccountingPeriodServiceImp {
+public class AccountingPeriodServiceImp implements AccountingPeriodService {
 
     private final AccountingPeriodRepository accountingPeriodRepository;
     private final MongoTemplate mongoTemplate;
-    private final AccountServiceImp accountServiceImp;
+    private final AccountService accountService;
 
     @Autowired
     public AccountingPeriodServiceImp(AccountingPeriodRepository accountingPeriodRepository,
                                       MongoTemplate mongoTemplate,
-                                      AccountServiceImp accountServiceImp) {
+                                      AccountService accountService) {
         this.accountingPeriodRepository = accountingPeriodRepository;
         this.mongoTemplate = mongoTemplate;
-        this.accountServiceImp = accountServiceImp;
+        this.accountService = accountService;
     }
 
     public AccountingPeriod createInitialPeriod(AccountSet accountSet, YearMonth startMonth) {
@@ -127,7 +128,7 @@ public class AccountingPeriodServiceImp {
         }
     }
 
-    // create accounting periods from a start accounting period to a end date
+    // create accounting periods from a start accounting period to an end date
     @Transactional
     public List<AccountingPeriod> createAccountingPeriodsFromStartPeriodToEndDate(AccountingPeriod startPeriod,
             LocalDate endDate) {
@@ -144,7 +145,7 @@ public class AccountingPeriodServiceImp {
         return accountingPeriodRepository.saveAll(accountingPeriods);
     }
 
-    // find the latest(mean it's date is the greatest) accounting period by
+    // find the latest(mean its date is the greatest) accounting period by
     // accountSetId
     @Cacheable(value = "accountingPeriods", key = "#accountSetId + '_last'")
     public AccountingPeriod findLastAccountingPeriodByAccountSetId(String accountSetId) {
@@ -153,7 +154,7 @@ public class AccountingPeriodServiceImp {
         return mongoTemplate.findOne(query, AccountingPeriod.class);
     }
 
-    // anti close to previous months include current month
+    // anti-close to previous months include current month
     @Caching(evict = {
             @CacheEvict(value = "accountingPeriods", key = "#accountingPeriod.accountSetId + '_current'"),
             @CacheEvict(value = "accountingPeriods", key = "#accountingPeriod.accountSetId + '_last'")
@@ -209,7 +210,7 @@ public class AccountingPeriodServiceImp {
     }
 
     private List<String> getRelatedAccountIds(String accountId) {
-        return accountServiceImp.findAccountAndAllAncestors(accountId).stream()
+        return accountService.findAccountAndAllAncestors(accountId).stream()
                 .map(Account::getId)
                 .collect(Collectors.toList());
     }
@@ -247,14 +248,25 @@ public class AccountingPeriodServiceImp {
     }
 
     @CachePut(value = "accountingPeriods", key = "#result.id")
-    private AccountingPeriod updateAccountingPeriodCache(AccountingPeriod period) {
+    public AccountingPeriod updateAccountingPeriodCache(AccountingPeriod period) {
         return period;
     }
 
     @CacheEvict(value = "accountingPeriods", key = "#period.id")
-    private void evictAccountingPeriodCache(AccountingPeriod period) {
+    public void evictAccountingPeriodCache(AccountingPeriod period) {
         // This method is intentionally left empty. The @CacheEvict annotation handles
         // the cache eviction.
+    }
+
+    @Override
+    public List<AccountingPeriod> findByAccountSetId(String accountSetId) {
+        return mongoTemplate.find(Query.query(Criteria.where("accountSetId").is(accountSetId)),AccountingPeriod.class);
+    }
+
+    @Override
+    @CacheEvict(value = "accountingPeriods", allEntries = true)
+    public void saveAll(List<AccountingPeriod> accountingPeriods) {
+        accountingPeriodRepository.saveAll(accountingPeriods);
     }
 
 }

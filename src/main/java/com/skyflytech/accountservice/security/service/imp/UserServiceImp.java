@@ -1,7 +1,8 @@
-package com.skyflytech.accountservice.security.service.Imp;
+package com.skyflytech.accountservice.security.service.imp;
 
 import com.skyflytech.accountservice.security.model.User;
 import com.skyflytech.accountservice.security.repository.UserRepository;
+import com.skyflytech.accountservice.security.service.UserService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -14,8 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 @Service
-public class UserServiceImp {
-
+public class UserServiceImp implements UserService
+{
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImp.class);
 
     private final UserRepository userRepository;

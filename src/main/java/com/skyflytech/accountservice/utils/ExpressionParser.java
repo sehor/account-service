@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ExpressionParser {
-    private Map<String, Double> variables;
+    private final Map<String, Double>  variables;
 
     public ExpressionParser() {
         this.variables = new HashMap<>();

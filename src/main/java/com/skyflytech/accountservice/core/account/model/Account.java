@@ -48,6 +48,7 @@ public class Account {
         this.parentId = parentId;
         this.balanceDirection = balanceDirection;
         this.state = state;
+        this.accountSetId=accountSetId;
     }
 
     public Account(String accountId, String name,String accountSetId, AccountType type, AccountingDirection balanceDirection, AccountState state) {

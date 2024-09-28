@@ -1,9 +1,9 @@
 package com.skyflytech.accountservice.security.controller;
 
-import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import com.skyflytech.accountservice.security.jwt.JwtUtil;
+import com.skyflytech.accountservice.security.model.CustomAuthentication;
 import com.skyflytech.accountservice.security.model.User;
-import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
+import com.skyflytech.accountservice.security.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,13 +33,13 @@ import java.util.Map;
 public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final JwtUtil jwtUtil;
-    private final UserServiceImp userServiceImp;
+    private final UserService userService;
     private final AuthenticationManager authenticationManager;
 
     @Autowired
-    public AuthController(JwtUtil jwtUtil, UserServiceImp userServiceImp, AuthenticationManager authenticationManager) {
+    public AuthController(JwtUtil jwtUtil, UserService userService, AuthenticationManager authenticationManager) {
         this.jwtUtil = jwtUtil;
-        this.userServiceImp = userServiceImp;
+        this.userService = userService;
         this.authenticationManager = authenticationManager;
     }
 
@@ -61,7 +61,7 @@ public class AuthController {
             try {
                 // 从token中提取信息
                 String username = jwtUtil.extractUsername(accessToken);
-                User user= userServiceImp.getUserByUsername(username);
+                User user= userService.getUserByUsername(username);
                 if(user==null){
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "未认证", "message", "用户未登录或会话已过期"));
@@ -79,8 +79,7 @@ public class AuthController {
                 logger.error("Error extracting information from JWT", e);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("处理用户信息时出错");
             }
-        } else if (authentication.getPrincipal() instanceof OAuth2User) {
-            OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
+        } else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
             response.put("name", oauth2User.getAttribute("name"));
             response.put("email", oauth2User.getAttribute("email"));
         } else {
@@ -96,7 +95,7 @@ public class AuthController {
         logger.info("registerUser: " + user.getUsername());
        
         try {
-            User registeredUser = userServiceImp.registerUser(user);
+            User registeredUser = userService.registerUser(user);
             return ResponseEntity.ok(registeredUser);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -172,7 +171,7 @@ public class AuthController {
         String refreshToken = getCookieValue(request, "refresh_token");
         if (refreshToken != null) {
             String username = jwtUtil.extractUsername(refreshToken);
-            UserDetails userDetails = userServiceImp.getUserByUsername(username);
+            UserDetails userDetails = userService.getUserByUsername(username);
             if (jwtUtil.validateToken(refreshToken, userDetails)) {
                 String newAccessToken = jwtUtil.generateToken(userDetails);
                 jwtUtil.addTokenCookie(response, "access_token", newAccessToken, false);

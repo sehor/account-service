@@ -1,6 +1,6 @@
 package com.skyflytech.accountservice.security.service;
 
-import com.skyflytech.accountservice.security.service.Imp.UserServiceImp;
+import com.skyflytech.accountservice.security.service.imp.UserServiceImp;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;

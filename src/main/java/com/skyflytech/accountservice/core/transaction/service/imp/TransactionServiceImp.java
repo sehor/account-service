@@ -1,11 +1,10 @@
 package com.skyflytech.accountservice.core.transaction.service.imp;
 
-import com.skyflytech.accountservice.core.account.service.imp.AccountServiceImp;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-import com.skyflytech.accountservice.core.transaction.model.Transaction;
-import com.skyflytech.accountservice.core.account.model.Account;
 import com.skyflytech.accountservice.core.journalEntry.model.JournalEntry;
+import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.core.transaction.repository.TransactionMongoRepository;
+import com.skyflytech.accountservice.core.transaction.service.TransactionService;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
@@ -21,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * @Author pzr
@@ -29,19 +27,17 @@ import java.util.stream.Collectors;
  * @Description:
  **/
 @Service
-public class TransactionServiceImp {
+public class TransactionServiceImp implements TransactionService {
     private final TransactionMongoRepository transactionRepository;
     private final MongoOperations mongoOperations;
-    private final AccountServiceImp accountServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
 
     @Autowired
-    public TransactionServiceImp(TransactionMongoRepository transactionRepository, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder, AccountServiceImp accountServiceImp) {
+    public TransactionServiceImp (TransactionMongoRepository transactionRepository, MongoOperations mongoOperations, CurrentAccountSetIdHolder currentAccountSetIdHolder) {
 
         this.transactionRepository = transactionRepository;
         this.mongoOperations = mongoOperations;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
-        this.accountServiceImp = accountServiceImp;
     }
 
     public List<Transaction> getAllTransactions(String accountSetId) {
@@ -58,17 +54,13 @@ public class TransactionServiceImp {
         return transactionRepository.findByAccountId(accountId);
     }
 
-    public Page<Transaction> findTransactionsByAccountAndPeriod(String accountId, LocalDate startDate, LocalDate endDate, int page, int size) {
+    public Page<Transaction> findTransactionsByAccountAndPeriod(List<String> leafAccountsIds, LocalDate startDate, LocalDate endDate, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         
         // 获取所有叶子子账户（包括当前账户，如果它是叶子账户）
-        List<Account> leafAccounts = accountServiceImp.getLeafSubAccounts(accountId);
-        List<String> leafAccountIds = leafAccounts.stream()
-                .map(Account::getId)
-                .collect(Collectors.toList());
 
         // 使用MongoDB的聚合操作来查询多个账户的交易并进行分页
-        Criteria criteria = Criteria.where("accountId").in(leafAccountIds)
+        Criteria criteria = Criteria.where("accountId").in(leafAccountsIds)
                 .and("modifiedDate").gte(startDate).lte(endDate);
 
         Aggregation aggregation = Aggregation.newAggregation(
@@ -104,7 +96,7 @@ public class TransactionServiceImp {
 
 
         @Transactional
-    protected Transaction saveTransaction(Transaction transaction) {
+    public Transaction saveTransaction(Transaction transaction) {
         checkAccountSetId(transaction);
         return transactionRepository.save(transaction);
     }
@@ -122,7 +114,7 @@ public class TransactionServiceImp {
                                            Transaction.class);
     }
 
-    protected void deleteTransaction(String transactionId) {
+    public void deleteTransaction(String transactionId) {
         Transaction transaction = transactionRepository.findById(transactionId).orElse(null);
         checkAccountSetId(transaction);
         transactionRepository.delete(transaction);
@@ -140,10 +132,7 @@ public class TransactionServiceImp {
         }
     }
 
-    @Transactional
-    public void deleteTransactionsByAccountSetId(String accountSetId) {
-        transactionRepository.deleteByAccountSetId(accountSetId);
-    }
+
 
     //find transactions by accountingPeriod
     public List<Transaction> findTransactionsByAccountingPeriod(AccountingPeriod accountingPeriod){
@@ -151,5 +140,10 @@ public class TransactionServiceImp {
         LocalDate endDate = accountingPeriod.getEndDate();
         String accountSetId = accountingPeriod.getAccountSetId();
         return transactionRepository.findByAccountSetIdAndModifiedDateBetween(accountSetId, startDate, endDate);
+    }
+
+    @Override
+    public void saveAll(List<Transaction> transactions) {
+        transactionRepository.saveAll(transactions);
     }
 }

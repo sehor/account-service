@@ -1,17 +1,12 @@
 package com.skyflytech.accountservice.core.journalEntry.service.imp;
 
-import com.skyflytech.accountservice.core.accountingPeriod.model.AccountAmountHolder;
 import com.skyflytech.accountservice.core.accountingPeriod.model.AccountingPeriod;
-import com.skyflytech.accountservice.core.journalEntry.service.ProcessJournalEntry;
-import com.skyflytech.accountservice.core.transaction.model.Transaction;
-import com.skyflytech.accountservice.core.account.model.AccountingDirection;
-import com.skyflytech.accountservice.core.journalEntry.model.AutoEntryTemplate;
 import com.skyflytech.accountservice.core.journalEntry.model.JournalEntry;
 import com.skyflytech.accountservice.core.journalEntry.model.JournalEntryView;
-import com.skyflytech.accountservice.core.report.model.AccountingOperation;
 import com.skyflytech.accountservice.core.journalEntry.repository.EntryMongoRepository;
+import com.skyflytech.accountservice.core.journalEntry.service.JournalEntryService;
+import com.skyflytech.accountservice.core.transaction.model.Transaction;
 import com.skyflytech.accountservice.security.model.CurrentAccountSetIdHolder;
-import com.skyflytech.accountservice.core.transaction.service.imp.TransactionServiceImp;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -22,9 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,31 +31,26 @@ import java.util.stream.Collectors;
  **/
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class JournalEntryServiceImp {
+public class JournalEntryServiceImp implements JournalEntryService {
 
     private final EntryMongoRepository journalEntryRepository;
-    private final TransactionServiceImp transactionServiceImp;
     private final CurrentAccountSetIdHolder currentAccountSetIdHolder;
     private final MongoTemplate mongoTemplate;
-    private final ProcessJournalEntry processJournalEntry;
+
     @Autowired
     public JournalEntryServiceImp(EntryMongoRepository journalEntryRepository,
-                                  TransactionServiceImp transactionServiceImp,
                                   CurrentAccountSetIdHolder currentAccountSetIdHolder,
-                                  MongoTemplate mongoTemplate,
-                                  ProcessJournalEntry processJournalEntry) {
+                                  MongoTemplate mongoTemplate) {
         this.journalEntryRepository = journalEntryRepository;
-        this.transactionServiceImp = transactionServiceImp;
         this.currentAccountSetIdHolder = currentAccountSetIdHolder;
         this.mongoTemplate = mongoTemplate;
-        this.processJournalEntry = processJournalEntry;
     }
 
     
     @Transactional
     public void deleteEntry(JournalEntry journalEntry) {
         checkAccountSetId(journalEntry);
-        transactionServiceImp.deleteByJourneyEntry(journalEntry);
+        deleteByJourneyEntry(journalEntry);
         journalEntryRepository.delete(journalEntry);
     }
 
@@ -105,25 +97,6 @@ public class JournalEntryServiceImp {
     public void deleteJournalEntriesByAccountSetId(String accountSetId) {
         journalEntryRepository.deleteByAccountSetId(accountSetId);
     }
-
-
-// 自动生成凭证
-public void autoGenerateJournalEntry(AutoEntryTemplate template,LocalDate createdDate) {
-    //find accountPeriod ,startDate<=createdDate<=endDate
-    Query query = new Query(Criteria.where("startDate").lte(createdDate).and("endDate").gte(createdDate));
-    AccountingPeriod accountPeriod = mongoTemplate.findOne(query, AccountingPeriod.class);  
-    //生成借方transactions
-    List<Transaction> transactions = generateTransactionsByOperations(template, accountPeriod);
-
-    //生成journalEntry
-    JournalEntry journalEntry = new JournalEntry();
-    journalEntry.setAccountSetId(template.getAccountSetId());
-    journalEntry.setCreatedDate(createdDate);
-    journalEntry.setModifiedDate(createdDate);
-    //生成journalEntryview
-    JournalEntryView journalEntryView = new JournalEntryView(journalEntry, transactions);
-    processJournalEntry.processJournalEntryView(journalEntryView);
-}
 
  //找到某个会计期间的最大凭证号
  public int findMaxVoucherNum(String accountSetId, LocalDate date) {
@@ -177,45 +150,16 @@ public boolean isVoucherNumContinuous(AccountingPeriod accountingPeriod) {
         }
     }
 
-    private List<Transaction> generateTransactionsByOperations(AutoEntryTemplate  template, AccountingPeriod accountPeriod) {
-        List<AccountingOperation> operations=template.getOperations();
-        List<Transaction> transactions = new ArrayList<>();
-        BigDecimal total=BigDecimal.ZERO;
-        for (AccountingOperation operation : operations) {
-            Transaction transaction = new Transaction();
-            transaction.setAccountId(operation.getAccountId());
-            AccountAmountHolder amountHolder=accountPeriod.getAmountHolders().get(operation.getAccountId());
-            BigDecimal amount=BigDecimal.ZERO;
-            switch(operation.getDataType()){
-                case DEBIT_TOTAL:
-                    amount=amountHolder.getTotalDebit();
-                    break;
-                case CREDIT_TOTAL:
-                    amount=amountHolder.getTotalCredit();
-                case BALANCE:
-                    amount=amountHolder.getBalance();
-                    break;
-            }
-            if(template.getOtherSide()==AccountingDirection.DEBIT){
-                transaction.setCredit(amount);
-            }else{
-                transaction.setDebit(amount);
-            }
-            total=total.add(amount);
-            transaction.setCreatedDate(accountPeriod.getEndDate());
-            transaction.setModifiedDate(accountPeriod.getEndDate());
-            transactions.add(transaction);
+
+
+    @Transactional
+     void deleteByJourneyEntry(JournalEntry entry) {
+
+        if(!entry.getAccountSetId().equals(currentAccountSetIdHolder.getCurrentAccountSetId())){
+            throw new ResponseStatusException(HttpStatus.NOT_ACCEPTABLE, "The accountSetId is not match.");
         }
-            Transaction transaction=new Transaction();
-            transaction.setAccountId(template.getOtherSideAccountId());
-        if(template.getOtherSide()==AccountingDirection.DEBIT){
-            transaction.setDebit(total);
-        }else{
-            transaction.setCredit(total);
-        }
-        transaction.setCreatedDate(accountPeriod.getEndDate());
-        transaction.setModifiedDate(accountPeriod.getEndDate());
-        transactions.add(transaction);
-        return transactions;
+        Set<String> transactionIds = entry.getTransactionIds();
+        mongoTemplate.findAllAndRemove(new Query(Criteria.where("id").in(transactionIds)),
+                Transaction.class);
     }
 }
